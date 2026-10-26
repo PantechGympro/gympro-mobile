@@ -92,7 +92,7 @@ export default function BarcodeScanner({ visible, onClose, onScanned }: Props) {
         ) : (
           <>
             <CameraView
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
               facing="back"
               barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES as any }}
               onBarcodeScanned={handleScanned}

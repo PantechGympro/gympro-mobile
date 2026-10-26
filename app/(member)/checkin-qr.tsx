@@ -119,7 +119,7 @@ export default function CheckinQr() {
     );
   }
 
-  if (usarEmbebido && !permission.granted) {
+  if (usarEmbebido && !permission?.granted) {
     return (
       <View style={[styles.center, { paddingTop: insets.top + 16 }]}>
         <Card style={{ alignItems: 'center', gap: 12 }}>
@@ -165,7 +165,7 @@ export default function CheckinQr() {
     return (
       <View style={styles.screen}>
         <CameraView
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           facing="back"
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
           onBarcodeScanned={estado === 'escaneando' ? handleBarcodeScanned : undefined}
