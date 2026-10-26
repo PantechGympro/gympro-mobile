@@ -4,7 +4,11 @@ Aplicación móvil de GymPro para Android, construida con React Native y Expo
 (enrutamiento con expo-router). Consume la misma API REST que el portal web y ofrece la
 experiencia orientada al uso diario de miembros, entrenadores, recepción y propietarios.
 
-Documentación completa del proyecto: [../doc/README.md](../doc/README.md)
+> **Arquitectura multi-repo:** este repo es parte de GymPro, dividido en 3 repos bajo la
+> organización [PantechGympro](https://github.com/PantechGympro):
+> [`gympro-api`](https://github.com/PantechGympro/gympro-api),
+> [`gympro-web`](https://github.com/PantechGympro/gympro-web) y
+> [`gympro-mobile`](https://github.com/PantechGympro/gympro-mobile) (este).
 
 ---
 
@@ -17,8 +21,9 @@ Documentación completa del proyecto: [../doc/README.md](../doc/README.md)
 | Cuenta de Expo | Necesaria para compilar con EAS | https://expo.dev/signup |
 | Dispositivo o emulador Android | El proyecto usa development build, no Expo Go | — |
 
-La API debe estar levantada (ver [../api/README.md](../api/README.md)) y accesible desde
-el dispositivo en la misma red.
+La API debe estar levantada (ver el README de
+[`gympro-api`](https://github.com/PantechGympro/gympro-api)) y accesible desde el
+dispositivo en la misma red.
 
 ---
 
