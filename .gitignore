@@ -15,3 +15,8 @@ web-build/
 
 expo-env.d.ts
 # @end expo-cli
+# --- IDEs y Sistema Operativo ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
