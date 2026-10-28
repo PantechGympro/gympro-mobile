@@ -90,6 +90,15 @@ export interface BodyProgress {
   cadera?:         number;
   bmi?:            number;
   fecha_registro:  string;
+  /**
+   * Foto de progreso asociada a esta medición (data URI, mismo criterio que
+   * `foto_perfil`). Campo opcional todavía sin respaldo real: hoy no existe
+   * ni el campo en el backend ni una UI para capturar/subir la foto al
+   * registrar una medición -- se deja listo en el tipo para que el
+   * historial (ver app/(member)/progress.tsx) pueda mostrarla el día que
+   * exista, pero en la práctica actual siempre llega undefined.
+   */
+  foto?:           string;
 }
 
 // ── Nutrition ─────────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@
  *   total". Umbrales de arranque (ver RANGOS), sin calibrar aún con datos
  *   reales de uso del gimnasio piloto.
  */
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +49,11 @@ type MuscleGroupWorkResponse = { grupos: GrupoTrabajo[]; resumen?: any };
 const STOP_BASE = [51, 65, 85];      // #334155 slate-700
 const STOP_MID  = [245, 158, 11];    // #F59E0B amber-500
 const STOP_HOT  = [220, 38, 38];     // #DC2626 red-600
+// Color de las regiones de un grupo NO seleccionado cuando hay un filtro
+// activo en la leyenda -- mismo gris que el color base "sin datos" de la
+// silueta (unselectedFragmentColor de BodySilhouette), para que atenuar se
+// vea como "apagar", no como un color nuevo en la paleta.
+const COLOR_ATENUADO = '#475569';
 
 function mezclar(a: number[], b: number[], t: number) {
   return a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -129,15 +134,29 @@ export default function MuscleMap2D() {
   const volumenPorGrupo: Record<string, number> = Object.fromEntries(grupos.map((g) => [g.grupo, g.volumen || 0]));
   const otros = grupos.filter((g) => !GRUPOS_CON_REGION.includes(g.grupo as any) && (g.volumen || 0) > 0);
 
-  // Estable mientras no cambien las intensidades: `BodySilhouette` lo llama
-  // una vez por fragmento (hasta 317) en cada render, así que no conviene
-  // recrearlo en cada pasada de render.
+  // Grupo tocado en la leyenda (ver JSDoc del archivo: "chip interactivo" --
+  // no hay forma de "filtrar el historial de mediciones" con esto porque el
+  // peso corporal no tiene dimensión por grupo muscular; lo que SÍ es
+  // coherente con los mismos datos es resaltar ese grupo en la silueta y
+  // atenuar el resto). Null = sin filtro, se ve el mapa completo normal.
+  const [grupoActivo, setGrupoActivo] = useState<string | null>(null);
+
+  // Estable mientras no cambien las intensidades ni el filtro: `BodySilhouette`
+  // lo llama una vez por fragmento (hasta 317) en cada render, así que no
+  // conviene recrearlo en cada pasada de render.
+  //
+  // `colorForSlug` siempre devuelve un color (nunca undefined) para los slugs
+  // mapeados, así que el "resaltado" tiene que vivir aquí: el color propio de
+  // `isSelected`/`selectedSlugs` de BodySilhouette nunca se usaría (solo es
+  // el color de respaldo cuando `colorForSlug` devuelve undefined).
   const colorForSlug = useCallback(
     (slug: string) => {
       const grupo = SLUG_A_GRUPO[slug];
-      return grupo ? colorPorIntensidad(intensidades[grupo] || 0) : undefined;
+      if (!grupo) return undefined;
+      if (grupoActivo && grupo !== grupoActivo) return COLOR_ATENUADO;
+      return colorPorIntensidad(intensidades[grupo] || 0);
     },
-    [intensidades],
+    [intensidades, grupoActivo],
   );
 
   return (
@@ -217,17 +236,31 @@ export default function MuscleMap2D() {
             {GRUPOS_CON_REGION.map((grupo) => {
               const vol = volumenPorGrupo[grupo] || 0;
               const rango = rangoDe(vol);
+              const activo = grupoActivo === grupo;
               return (
-                <View key={grupo} style={styles.rangoChip}>
+                <TouchableOpacity
+                  key={grupo}
+                  style={[styles.rangoChip, activo && styles.rangoChipActiva]}
+                  onPress={() => setGrupoActivo((g) => (g === grupo ? null : grupo))}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: activo }}
+                  accessibilityLabel={`Resaltar ${grupo} en la silueta`}
+                >
                   <View style={[styles.rangoDot, { backgroundColor: colorPorIntensidad(intensidades[grupo] || 0) }]} />
                   <Ionicons name="ribbon-outline" size={13} color={rango ? rango.color : colors.textMuted} />
-                  <Text style={styles.rangoTexto}>
+                  <Text style={[styles.rangoTexto, activo && { color: colors.accent }]}>
                     {grupo} <Text style={styles.rangoSub}>· {rango ? rango.nombre : 'Sin rango'}</Text>
                   </Text>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
+          {grupoActivo && (
+            <TouchableOpacity onPress={() => setGrupoActivo(null)} style={styles.limpiarFiltro}>
+              <Ionicons name="close-circle-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.limpiarFiltroText}>Quitar resaltado de {grupoActivo}</Text>
+            </TouchableOpacity>
+          )}
 
           {otros.length > 0 && (
             <Text style={styles.otrosText}>
@@ -259,6 +292,9 @@ function make_styles(colors: any, fs: number) {
       paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999,
       backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
     },
+    rangoChipActiva: { borderColor: colors.accent, backgroundColor: colors.accent + '18' },
+    limpiarFiltro: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
+    limpiarFiltroText: { fontSize: 11 * fs, color: colors.textMuted, textDecorationLine: 'underline' },
     rangoDot: { width: 8, height: 8, borderRadius: 4 },
     rangoTexto: { fontSize: 11.5 * fs, color: colors.text, fontWeight: '600' },
     rangoSub: { fontSize: 10.5 * fs, color: colors.textSecondary, fontWeight: '400' },
