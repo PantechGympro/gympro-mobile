@@ -2,6 +2,18 @@
  * CustomDrawer — Sidebar izquierda compartida para todos los roles.
  * Incluye botón de accesibilidad (⚙) que abre AccessibilityPanel.
  * Reacciona al tema activo vía useColors().
+ *
+ * Rediseño de navegación global (ver ../../app/(member)/_layout.tsx para el
+ * resto del contexto): el cajón dejó de llevar Inicio/Entrenamiento/
+ * Nutrición/Perfil (ahora en la Bottom Tab Bar) y los acordeones
+ * desplegables de Membresía/Progreso se fusionaron en ítems directos. Lo
+ * que queda aquí es: la lista dinámica de Drawer.Screen no ocultas (para
+ * el rol Miembro: Membresía, Progreso y Salud, Punto de Venta — los demás
+ * roles siguen viendo la suya propia, sin cambios) más un bloque fijo de
+ * opciones de app (Ajustes, Notificaciones, Accesibilidad, Soporte) que no
+ * son Drawer.Screen porque sus pantallas no viven dentro de este grupo de
+ * rutas, o no son ni siquiera una pantalla (Accesibilidad es un modal
+ * local).
  */
 import React, { useState } from 'react';
 import {
@@ -41,26 +53,19 @@ import AccessibilityPanel from '../settings/AccessibilityPanel';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
- * Grupos desplegables del cajón — SOLO para el rol Miembro (ver `esMiembro`
- * más abajo). El resto de los roles sigue viendo su lista plana de siempre;
- * esto no les afecta en nada.
- *
- * Retroalimentación de Miguel: el cajón del Miembro tenía demasiados ítems al
- * mismo nivel y se sentía saturado. En vez de fusionar esas pantallas en una
- * sola (un rediseño mucho más riesgoso, tocando la lógica de cada una), se
- * agrupan aquí SOLO en la navegación -como ya hace el sidebar del portal web
- * con "Mi Membresía ▾" (ver web/src/components/compartido/Sidebar.jsx)-: cada
- * pantalla sigue siendo su propio archivo/ruta, el cajón nada más las anida
- * bajo un encabezado desplegable.
- *
- * 'Entrenamiento' YA NO está aquí: se consolidó en un único ítem plano (sin
- * dropdown) que entra directo al Paso A del flujo de 3 pasos -- ver
- * app/(member)/_layout.tsx y app/(member)/training.tsx.
+ * Bloque fijo de opciones de app -- igual para todos los roles, siempre al
+ * final de la lista dinámica. No son Drawer.Screen: Ajustes y Soporte son
+ * rutas compartidas fuera de cualquier grupo de rol (ver app/ajustes.tsx y
+ * app/soporte.tsx), Notificaciones vive en app/notifications.tsx (ya
+ * existía como ícono del header; ahora también aparece aquí), y
+ * Accesibilidad no navega a ningún lado: abre el modal local más abajo.
  */
-interface GrupoCajon { id: string; label: string; icon: IconName; rutas: string[] }
-const GRUPOS_MIEMBRO: GrupoCajon[] = [
-  { id: 'grp-membresia',     label: 'Mi Membresía',     icon: 'card-outline',    rutas: ['membership', 'payments'] },
-  { id: 'grp-progreso',      label: 'Progreso y Salud', icon: 'pulse-outline',   rutas: ['progress', 'health', 'prediccion'] },
+interface OpcionApp { id: string; label: string; icon: IconName }
+const OPCIONES_APP: OpcionApp[] = [
+  { id: 'ajustes',       label: 'Ajustes',       icon: 'settings-outline' },
+  { id: 'notificaciones', label: 'Notificaciones', icon: 'notifications-outline' },
+  { id: 'accesibilidad', label: 'Accesibilidad', icon: 'accessibility-outline' },
+  { id: 'soporte',       label: 'Soporte',       icon: 'help-buoy-outline' },
 ];
 
 function getRoleLabel(role?: string): string {
@@ -90,22 +95,12 @@ export default function CustomDrawer(props: PropsCajon) {
   const initials  = nombre.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
   const roleLabel = getRoleLabel(user?.role);
 
-  // ── Grupos desplegables (solo Miembro) ──────────────────────────────────
-  const esMiembro   = user?.role === 'Miembro' || user?.role === 'user';
-  const gruposCajon = esMiembro ? GRUPOS_MIEMBRO : [];
-  const rutasAgrupadas = new Set(gruposCajon.flatMap((g) => g.rutas));
-  const rutaActivaName  = state.routes[state.index]?.name;
-  const grupoDeRutaActiva = gruposCajon.find((g) => g.rutas.includes(rutaActivaName))?.id;
-  // El grupo de la ruta activa arranca expandido (para no esconder dónde
-  // estás parado); a partir de ahí, el usuario decide con el toggle.
-  const [expandidos, setExpandidos] = useState<Set<string>>(
-    () => new Set(grupoDeRutaActiva ? [grupoDeRutaActiva] : []),
-  );
-  const toggleGrupo = (id: string) => setExpandidos((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const irAOpcionApp = (id: string) => {
+    if (id === 'accesibilidad') { setShowA11y(true); return; }
+    if (id === 'ajustes')       { router.push('/ajustes');       return; }
+    if (id === 'notificaciones') { router.push('/notifications'); return; }
+    if (id === 'soporte')       { router.push('/soporte');       return; }
+  };
 
   return (
     <>
@@ -113,39 +108,16 @@ export default function CustomDrawer(props: PropsCajon) {
 
         {/* ── Cabecera ──────────────────────────────────────────────────── */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <View style={styles.headerTop}>
-            {user?.foto_perfil && user.foto_perfil.startsWith('data:image') ? (
-              <Image source={{ uri: user.foto_perfil }}
-                     style={[styles.avatarImg, { backgroundColor: colors.surface }]}
-                     resizeMode="cover" />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-                <Text style={[styles.initials, { color: colors.onAccent }]}>{initials}</Text>
-              </View>
-            )}
-            <View style={styles.headerActions}>
-              {/* Botón notificaciones */}
-              <TouchableOpacity
-                style={[styles.a11yBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => router.push('/notifications')}
-                accessibilityLabel="Notificaciones"
-                accessibilityRole="button"
-              >
-                <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {/* Botón accesibilidad */}
-              <TouchableOpacity
-                style={[styles.a11yBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setShowA11y(true)}
-                accessibilityLabel="Ajustes de accesibilidad"
-                accessibilityRole="button"
-              >
-                <Ionicons name="accessibility-outline" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
+          {user?.foto_perfil && user.foto_perfil.startsWith('data:image') ? (
+            <Image source={{ uri: user.foto_perfil }}
+                   style={[styles.avatarImg, { backgroundColor: colors.surface, borderColor: colors.accent }]}
+                   resizeMode="cover" />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.accent, borderColor: colors.accent }]}>
+              <Text style={[styles.initials, { color: colors.onAccent }]}>{initials}</Text>
             </View>
-          </View>
-          <Text style={[styles.name,  { color: colors.text,          fontSize: 16 * fs }]} numberOfLines={1}>{nombre}</Text>
-          <Text style={[styles.email, { color: colors.textSecondary, fontSize: 12 * fs }]} numberOfLines={1}>{toStr(user?.email)}</Text>
+          )}
+          <Text style={[styles.name, { color: colors.text, fontSize: 17 * fs }]} numberOfLines={1}>{nombre}</Text>
           <View style={[styles.rolePill, { backgroundColor: colors.accent + '22' }]}>
             <Text style={[styles.roleText, { color: colors.accent, fontSize: 11 * fs }]}>{roleLabel}</Text>
           </View>
@@ -157,150 +129,75 @@ export default function CustomDrawer(props: PropsCajon) {
           contentContainerStyle={styles.navList}
           showsVerticalScrollIndicator={false}
         >
-          {(() => {
-            const gruposYaDibujados = new Set<string>();
-            return state.routes.map((route: any, i: number) => {
-              const { options } = descriptors[route.key];
-              const isFocused   = state.index === i;
+          {state.routes.map((route: any, i: number) => {
+            const { options } = descriptors[route.key];
+            const isFocused   = state.index === i;
 
-              // Ocultar ítems con display:none
-              const itemStyle = options.drawerItemStyle as any;
-              if (itemStyle?.display === 'none') return null;
+            // Ocultar ítems con display:none (incluye el contenedor de la
+            // Bottom Tab Bar y las rutas internas de cada flujo).
+            const itemStyle = options.drawerItemStyle as any;
+            if (itemStyle?.display === 'none') return null;
 
-              // ── Ítem agrupado: se dibuja el grupo completo una sola vez,
-              //    en la posición de su primer miembro encontrado; los demás
-              //    miembros del mismo grupo se saltan aquí (ya quedaron
-              //    anidados dentro del encabezado desplegable). ──────────
-              const grupo = rutasAgrupadas.has(route.name)
-                ? gruposCajon.find((g) => g.rutas.includes(route.name))
-                : undefined;
-              if (grupo) {
-                if (gruposYaDibujados.has(grupo.id)) return null;
-                gruposYaDibujados.add(grupo.id);
-                const abierto     = expandidos.has(grupo.id);
-                const grupoActivo = grupo.rutas.includes(rutaActivaName);
-                return (
-                  <View key={grupo.id}>
-                    <TouchableOpacity
-                      onPress={() => toggleGrupo(grupo.id)}
-                      style={[
-                        styles.navItem,
-                        { borderRadius: 12 },
-                        grupoActivo && !abierto && { backgroundColor: colors.accent + '18' },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${grupo.label}, ${abierto ? 'contraer' : 'expandir'}`}
-                      accessibilityState={{ expanded: abierto }}
-                    >
-                      <View style={styles.navIcon}>
-                        <Ionicons name={grupo.icon} size={22} color={grupoActivo ? colors.accent : colors.textSecondary} />
-                      </View>
-                      <Text
-                        style={[
-                          styles.navLabel,
-                          { color: grupoActivo ? colors.accent : colors.textSecondary, fontSize: 14 * fs },
-                          grupoActivo && { fontWeight: '700' },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {grupo.label}
-                      </Text>
-                      <Ionicons
-                        name={abierto ? 'chevron-up' : 'chevron-down'}
-                        size={16}
-                        color={colors.textMuted}
-                      />
-                    </TouchableOpacity>
+            const rawLabel = options.drawerLabel ?? options.title ?? route.name;
+            const label    = typeof rawLabel === 'function'
+              ? rawLabel({ focused: isFocused, color: isFocused ? colors.accent : colors.textSecondary })
+              : rawLabel;
 
-                    {abierto && grupo.rutas.map((rName) => {
-                      const idx = state.routes.findIndex((r: any) => r.name === rName);
-                      if (idx < 0) return null; // esta instalación no tiene esa pantalla
-                      const childRoute = state.routes[idx];
-                      const { options: cOptions } = descriptors[childRoute.key];
-                      const childFocused = state.index === idx;
-                      const cRawLabel = cOptions.drawerLabel ?? cOptions.title ?? childRoute.name;
-                      const cLabel = typeof cRawLabel === 'function'
-                        ? cRawLabel({ focused: childFocused, color: childFocused ? colors.accent : colors.textSecondary })
-                        : cRawLabel;
-                      const cIcon = cOptions.drawerIcon?.({
-                        focused: childFocused,
-                        color:   childFocused ? colors.accent : colors.textSecondary,
-                        size:    18,
-                      });
-                      return (
-                        <TouchableOpacity
-                          key={childRoute.key}
-                          onPress={() => navigation.navigate(childRoute.name)}
-                          style={[
-                            styles.navItemChild,
-                            { borderRadius: 10 },
-                            childFocused && { backgroundColor: colors.accent + '18' },
-                          ]}
-                          accessibilityRole="button"
-                          accessibilityLabel={String(cLabel)}
-                          accessibilityState={{ selected: childFocused }}
-                        >
-                          <View style={styles.navIconChild}>{cIcon}</View>
-                          <Text
-                            style={[
-                              styles.navLabelChild,
-                              { color: childFocused ? colors.accent : colors.textSecondary, fontSize: 13 * fs },
-                              childFocused && { fontWeight: '700' },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {String(cLabel)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                );
-              }
-
-              // ── Ítem plano, igual que antes ─────────────────────────────
-              const rawLabel = options.drawerLabel ?? options.title ?? route.name;
-              const label    = typeof rawLabel === 'function'
-                ? rawLabel({ focused: isFocused, color: isFocused ? colors.accent : colors.textSecondary })
-                : rawLabel;
-
-              const iconEl = options.drawerIcon?.({
-                focused: isFocused,
-                color:   isFocused ? colors.accent : colors.textSecondary,
-                size:    22,
-              });
-
-              return (
-                <TouchableOpacity
-                  key={route.key}
-                  onPress={() => navigation.navigate(route.name)}
-                  style={[
-                    styles.navItem,
-                    { borderRadius: 12 },
-                    isFocused && { backgroundColor: colors.accent + '18' },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={String(label)}
-                  accessibilityState={{ selected: isFocused }}
-                >
-                  <View style={styles.navIcon}>{iconEl}</View>
-                  <Text
-                    style={[
-                      styles.navLabel,
-                      { color: isFocused ? colors.accent : colors.textSecondary, fontSize: 14 * fs },
-                      isFocused && { fontWeight: '700' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {String(label)}
-                  </Text>
-                  {isFocused && (
-                    <View style={[styles.activeIndicator, { backgroundColor: colors.accent }]} />
-                  )}
-                </TouchableOpacity>
-              );
+            const iconEl = options.drawerIcon?.({
+              focused: isFocused,
+              color:   isFocused ? colors.accent : colors.textSecondary,
+              size:    22,
             });
-          })()}
+
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={() => navigation.navigate(route.name)}
+                style={[
+                  styles.navItem,
+                  { borderRadius: 12 },
+                  isFocused && { backgroundColor: colors.accent + '18' },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={String(label)}
+                accessibilityState={{ selected: isFocused }}
+              >
+                <View style={styles.navIcon}>{iconEl}</View>
+                <Text
+                  style={[
+                    styles.navLabel,
+                    { color: isFocused ? colors.accent : colors.textSecondary, fontSize: 14 * fs },
+                    isFocused && { fontWeight: '700' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {String(label)}
+                </Text>
+                {isFocused && (
+                  <View style={[styles.activeIndicator, { backgroundColor: colors.accent }]} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* ── Opciones de app (fijas, no son Drawer.Screen) ────────────── */}
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>GENERAL</Text>
+          {OPCIONES_APP.map(({ id, label, icon }) => (
+            <TouchableOpacity
+              key={id}
+              onPress={() => irAOpcionApp(id)}
+              style={[styles.navItem, { borderRadius: 12 }]}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+            >
+              <View style={styles.navIcon}>
+                <Ionicons name={icon} size={22} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.navLabel, { color: colors.textSecondary, fontSize: 14 * fs }]} numberOfLines={1}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
 
         {/* ── Footer ───────────────────────────────────────────────────── */}
@@ -328,30 +225,30 @@ export default function CustomDrawer(props: PropsCajon) {
 
 const styles = StyleSheet.create({
   root:      { flex: 1 },
-  header:    { paddingHorizontal: 20, paddingVertical: 16, gap: 4, borderBottomWidth: 1 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  avatar:    { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarImg: { width: 60, height: 60, borderRadius: 20 },
-  initials:  { fontSize: 24, fontWeight: '800' },   // color: colors.onAccent en línea
-  a11yBtn:   { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  name:      { fontWeight: '700' },
-  email:     {},
-  rolePill:  { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, marginTop: 4 },
+  // Más padding interno y borde de acento sutil alrededor del avatar
+  // (pedido explícito del rediseño); se quitaron los dos botones de acción
+  // (notificaciones/accesibilidad) que vivían aquí -- ahora son filas del
+  // menú (OPCIONES_APP), así que la cabecera ya no necesita repartir el
+  // espacio con ellos y el avatar respira más.
+  header:    { paddingHorizontal: 20, paddingVertical: 22, alignItems: 'center', gap: 6, borderBottomWidth: 1 },
+  avatar:    { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  avatarImg: { width: 72, height: 72, borderRadius: 24, borderWidth: 2 },
+  initials:  { fontSize: 26, fontWeight: '800' },   // color: colors.onAccent en línea
+  name:      { fontWeight: '700', marginTop: 4 },
+  // `email` se quitó: ya se muestra con más detalle en Mi Perfil, repetirlo
+  // aquí era ruido (pedido explícito del rediseño).
+  rolePill:  { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, marginTop: 2 },
   roleText:  { fontWeight: '600' },
   navScroll: { flex: 1 },
   navList:   { paddingHorizontal: 12, paddingVertical: 8, gap: 2 },
   navItem:   { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 14, position: 'relative' },
   navIcon:   { width: 26, alignItems: 'center' },
   navLabel:  { flex: 1, fontWeight: '500' },
-  // Ítems anidados dentro de un grupo desplegable: mismo patrón que
-  // navItem/navIcon/navLabel, con indentación e íconos más chicos para que
-  // se note la jerarquía sin duplicar todo el bloque de estilos.
-  navItemChild:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 14, marginLeft: 22 },
-  navIconChild:  { width: 20, alignItems: 'center' },
-  navLabelChild: { flex: 1, fontWeight: '500' },
   activeIndicator: { position: 'absolute', right: 0, top: '15%', bottom: '15%', width: 3, borderRadius: 2 },
-  footer:    { paddingHorizontal: 12, paddingTop: 8, gap: 6, borderTopWidth: 1 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 14, marginBottom: 4, marginLeft: 14 },
+  // Más separación antes del indicador de versión (pedido explícito del
+  // rediseño: "margen adecuado sobre GymPro v1.0.0").
+  footer:    { paddingHorizontal: 12, paddingTop: 10, gap: 10, borderTopWidth: 1 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12 },
   logoutIcon:{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   logoutText:{ fontWeight: '600' },
