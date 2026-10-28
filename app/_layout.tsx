@@ -86,6 +86,8 @@ function AppContent() {
         <Stack.Screen name="(admin)"   options={{ headerShown: false }} />
         <Stack.Screen name="(receptionist)" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="ajustes" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="soporte" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </>
   );
