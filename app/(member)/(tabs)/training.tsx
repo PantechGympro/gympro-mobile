@@ -17,6 +17,15 @@
  * api/app/routes/miembro/user_routine.py y .../training.py-- no hace falta
  * ningún endpoint nuevo), solo que ahora se combinan aquí para resolver "qué
  * rutina toca" en CUALQUIER día de la semana, no solo hoy (ver candidata).
+ *
+ * Rediseño UI/UX (este archivo): el selector semanal ahora marca con un
+ * punto verde los días con rutina asignada y con un check los ya
+ * completados en la semana en curso (GET /api/user/workouts, mismo
+ * endpoint de la bitácora que usa workout-log.tsx -- no hace falta nada
+ * nuevo del backend). La tarjeta del día es clicable por completo y el CTA
+ * ya no es un botón secundario pequeño. El grid de accesos homogeneiza
+ * tamaño/trazo y el badge "Próximamente" de IA pasa a un candado neutro en
+ * esquina, para no delatar con naranja algo que no es una alerta.
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -42,7 +51,17 @@ const normTxt = (s?: string) =>
     .replace(/ó/g, 'o').replace(/ú/g, 'u').trim();
 // Date#getDay(): domingo=0..sábado=6; DIAS empieza en lunes -- este índice
 // traduce uno al otro para que el chip de "hoy" arranque seleccionado.
-const indiceHoy = () => (new Date().getDay() + 6) % 7;
+const indiceSemana = (d: Date) => (d.getDay() + 6) % 7;
+const indiceHoy = () => indiceSemana(new Date());
+
+/** Lunes 00:00 de la semana en curso -- base para "completado esta semana". */
+function inicioSemanaActual(): Date {
+  const hoy = new Date();
+  const d = new Date(hoy);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - indiceSemana(hoy));
+  return d;
+}
 
 interface Ejercicio {
   nombre: string; series?: string | number; reps?: string | number; peso?: string | number;
@@ -56,6 +75,12 @@ interface Rutina {
 type Origen = 'propia' | 'entrenador';
 type RutinaUI = Rutina & { origen: Origen };
 
+// Solo lo que necesitamos de GET /api/user/workouts (bitácora) para marcar
+// qué días de ESTA semana ya se entrenaron -- misma forma que usa
+// workout-log.tsx, no se agrega ningún campo nuevo.
+interface WorkoutItemFecha { fecha: string }
+interface WorkoutsResponseFechas { workouts: WorkoutItemFecha[] }
+
 export default function TrainingScreen() {
   const colors = useColors();
   const fs     = useFontScale();
@@ -66,14 +91,45 @@ export default function TrainingScreen() {
     useFetch<{ rutinas: Rutina[] }>(ENDPOINTS.USER_ROUTINES);
   const { data: asignadasData, loading: loadingAsignadas, refetch: refetchAsignadas } =
     useFetch<{ rutinas: Rutina[] }>(ENDPOINTS.USER_ASSIGNED_ROUTINES);
+  const { data: workoutsData, refetch: refetchWorkouts } =
+    useFetch<WorkoutsResponseFechas>(ENDPOINTS.USER_WORKOUTS);
 
   const cargando = loadingPropias || loadingAsignadas;
-  const refetch  = () => { refetchPropias(); refetchAsignadas(); };
+  const refetch  = () => { refetchPropias(); refetchAsignadas(); refetchWorkouts(); };
 
   const rutinas = useMemo<RutinaUI[]>(() => [
     ...toArray<Rutina>(asignadasData?.rutinas).map((r) => ({ ...r, origen: 'entrenador' as const })),
     ...toArray<Rutina>(propiasData?.rutinas).map((r) => ({ ...r, origen: 'propia' as const })),
   ], [asignadasData, propiasData]);
+
+  // Qué días de la semana tienen AL MENOS una rutina activa asignada (punto
+  // verde del selector) -- independiente de cuál se esté previsualizando.
+  const diasConRutina = useMemo(() => {
+    const set = new Set<number>();
+    for (const r of rutinas) {
+      if (r.activa === false) continue;
+      for (const dia of toArray(r.dias)) {
+        const i = DIAS.findIndex((d) => normTxt(dia.dia).includes(normTxt(d)));
+        if (i >= 0) set.add(i);
+      }
+    }
+    return set;
+  }, [rutinas]);
+
+  // Qué días de ESTA semana ya se entrenaron de verdad (check del
+  // selector) -- a partir de la bitácora, no de lo planeado.
+  const diasCompletados = useMemo(() => {
+    const set = new Set<number>();
+    const inicio = inicioSemanaActual();
+    const fin = new Date(inicio);
+    fin.setDate(fin.getDate() + 7);
+    for (const w of toArray<WorkoutItemFecha>(workoutsData?.workouts)) {
+      const f = new Date(w.fecha);
+      if (Number.isNaN(f.getTime()) || f < inicio || f >= fin) continue;
+      set.add(indiceSemana(f));
+    }
+    return set;
+  }, [workoutsData]);
 
   const [diaIdx, setDiaIdx] = useState(indiceHoy());
   const nombreDia = DIAS[diaIdx];
@@ -111,6 +167,9 @@ export default function TrainingScreen() {
     dias:              candidata.routine.dias,
   } : null;
 
+  const totalEjercicios = candidata ? toArray(candidata.dia.ejercicios).length : 0;
+  const previewEjercicios = candidata ? toArray<Ejercicio>(candidata.dia.ejercicios).slice(0, 3) : [];
+
   return (
     <ScrollView
       style={styles.screen}
@@ -125,27 +184,51 @@ export default function TrainingScreen() {
 
       {/* Selector de día -- unifica lo que antes era "elegir día" dentro de
           Mi Rutina con la vista general del plan. No fuerza nada: solo
-          cambia qué día se PREVISUALIZA en la tarjeta de abajo. */}
+          cambia qué día se PREVISUALIZA en la tarjeta de abajo. El punto
+          verde y el check son solo informativos (ver diasConRutina /
+          diasCompletados arriba), no cambian qué se puede tocar. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diasRow}>
-        {DIAS.map((d, i) => (
-          <TouchableOpacity
-            key={d}
-            onPress={() => setDiaIdx(i)}
-            style={[styles.diaChip, i === diaIdx && styles.diaChipActivo]}
-            accessibilityRole="button"
-            accessibilityLabel={`${d}${i === diaIdx ? ', seleccionado' : ''}`}
-          >
-            <Text style={[styles.diaChipTexto, i === diaIdx && styles.diaChipTextoActivo]}>
-              {DIAS_CORTOS[i]}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {DIAS.map((d, i) => {
+          const completado = diasCompletados.has(i);
+          const conRutina  = diasConRutina.has(i);
+          return (
+            <TouchableOpacity
+              key={d}
+              onPress={() => setDiaIdx(i)}
+              style={[styles.diaChip, i === diaIdx && styles.diaChipActivo]}
+              accessibilityRole="button"
+              accessibilityLabel={`${d}${conRutina ? ', con rutina' : ''}${completado ? ', completado' : ''}${i === diaIdx ? ', seleccionado' : ''}`}
+            >
+              <Text style={[styles.diaChipTexto, i === diaIdx && styles.diaChipTextoActivo]}>
+                {DIAS_CORTOS[i]}
+              </Text>
+              <View style={styles.diaChipIndicador}>
+                {completado ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={12}
+                    color={i === diaIdx ? colors.onAccent : colors.success}
+                  />
+                ) : conRutina ? (
+                  <View style={[styles.diaDot, { backgroundColor: i === diaIdx ? colors.onAccent : colors.success }]} />
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      {/* Tarjeta del día */}
-      <Card style={styles.diaCard}>
-        {candidata ? (
-          <>
+      {/* Tarjeta del día -- clicable por completo (ver onPress del wrapper);
+          el CTA principal de abajo hace lo mismo, por si no es obvio que la
+          tarjeta entera responde al toque. */}
+      {candidata ? (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setVerDetalle(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver ${candidata.routine.nombre}`}
+        >
+          <Card style={styles.diaCard}>
             <View style={styles.diaCardHeader}>
               <View style={styles.diaCardIcon}>
                 <Ionicons name="barbell-outline" size={22} color={colors.accent} />
@@ -172,31 +255,47 @@ export default function TrainingScreen() {
               <View style={styles.metaPill}>
                 <Ionicons name="list-outline" size={12} color={colors.textSecondary} />
                 <Text style={styles.metaPillTexto}>
-                  {toArray(candidata.dia.ejercicios).length} ejercicios
+                  {totalEjercicios} {totalEjercicios === 1 ? 'ejercicio' : 'ejercicios'}
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.verBtn}
-              onPress={() => setVerDetalle(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver ${candidata.routine.nombre}`}
-            >
-              <Ionicons name="eye-outline" size={14} color={colors.onAccent} />
-              <Text style={styles.verBtnTexto}>Ver</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
+
+            {/* Vista previa de los primeros ejercicios de la sesión -- solo
+                para dar una idea de qué toca hoy sin tener que abrir el
+                detalle completo (Paso B). */}
+            {previewEjercicios.length > 0 && (
+              <View style={styles.previewRow}>
+                {previewEjercicios.map((ej, i) => (
+                  <View key={i} style={styles.previewChip}>
+                    <Text style={styles.previewChipTexto} numberOfLines={1}>{ej.nombre}</Text>
+                  </View>
+                ))}
+                {totalEjercicios > previewEjercicios.length && (
+                  <Text style={styles.previewMas}>+{totalEjercicios - previewEjercicios.length}</Text>
+                )}
+              </View>
+            )}
+
+            <View style={styles.iniciarBtn}>
+              <Ionicons name="play-circle" size={18} color={colors.onAccent} />
+              <Text style={styles.iniciarBtnTexto}>Iniciar Rutina</Text>
+            </View>
+          </Card>
+        </TouchableOpacity>
+      ) : (
+        <Card style={styles.diaCard}>
           <View style={styles.diaVacio}>
             <Ionicons name="moon-outline" size={32} color={colors.textMuted} />
             <Text style={styles.diaVacioTexto}>
               {diaIdx === indiceHoy() ? 'Hoy no tienes rutina asignada.' : 'Sin rutina para este día.'}
             </Text>
           </View>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      {/* Accesos directos */}
+      {/* Accesos directos -- mismo tamaño de ícono/trazo y mismo padding
+          interno en las 3 tarjetas, para que se vean como un solo grupo
+          homogéneo y no como piezas sueltas. */}
       <View style={styles.accesosRow}>
         <TouchableOpacity
           style={styles.accesoCard}
@@ -204,19 +303,23 @@ export default function TrainingScreen() {
           accessibilityRole="button"
           accessibilityLabel="Mi Biblioteca"
         >
-          <Ionicons name="library-outline" size={22} color={colors.accent} />
+          <Ionicons name="library-outline" size={24} color={colors.accent} />
           <Text style={styles.accesoTexto}>Mi Biblioteca</Text>
         </TouchableOpacity>
 
         {/* Generar entrenamiento con IA -- fuera de alcance por ahora (no hay
-            backend ni modelo todavía): se deja el acceso visible como
-            "Próximamente" para no prometer algo que no funciona. */}
+            backend ni modelo todavía): se deja el acceso visible pero
+            bloqueado, con un candado neutro en la esquina en vez del badge
+            naranja "Próximamente" -- el naranja es el tono de advertencia de
+            la paleta y esto no es una alerta, solo algo pendiente. El
+            candado va POSICIONADO ABSOLUTO (no ocupa una línea extra) para
+            que esta tarjeta mida exactamente lo mismo que las otras dos. */}
         <View style={[styles.accesoCard, styles.accesoDeshabilitado]}>
-          <Ionicons name="sparkles-outline" size={22} color={colors.textMuted} />
-          <Text style={[styles.accesoTexto, { color: colors.textMuted }]}>Generar con IA</Text>
-          <View style={styles.proximamenteBadge}>
-            <Text style={styles.proximamenteTexto}>Próximamente</Text>
+          <View style={styles.candadoBadge}>
+            <Ionicons name="lock-closed" size={11} color={colors.textMuted} />
           </View>
+          <Ionicons name="sparkles-outline" size={24} color={colors.textMuted} />
+          <Text style={[styles.accesoTexto, { color: colors.textMuted }]}>Generar con IA</Text>
         </View>
 
         <TouchableOpacity
@@ -225,7 +328,7 @@ export default function TrainingScreen() {
           accessibilityRole="button"
           accessibilityLabel="Chat con tu entrenador"
         >
-          <Ionicons name="chatbubbles-outline" size={22} color={colors.accent} />
+          <Ionicons name="chatbubbles-outline" size={24} color={colors.accent} />
           <Text style={styles.accesoTexto}>Chat con tu entrenador</Text>
         </TouchableOpacity>
       </View>
@@ -253,12 +356,15 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     subtitle:{ color: colors.textSecondary, fontSize: 13 * fs },
     diasRow: { gap: 6, paddingVertical: 2 },
     diaChip: {
+      alignItems: 'center', gap: 4,
       paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20,
       backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     },
     diaChipActivo:      { backgroundColor: colors.accent, borderColor: colors.accent },
     diaChipTexto:       { color: colors.textSecondary, fontSize: 12.5 * fs, fontWeight: '700' },
     diaChipTextoActivo: { color: colors.onAccent },
+    diaChipIndicador:   { height: 8, justifyContent: 'center' },
+    diaDot:             { width: 5, height: 5, borderRadius: 3 },
     diaCard:        { gap: 12 },
     diaCardHeader:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
     diaCardIcon:    {
@@ -273,23 +379,33 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
       backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5,
     },
     metaPillTexto: { color: colors.textSecondary, fontSize: 12 * fs, fontWeight: '600' },
-    verBtn: {
-      flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 6,
-      backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9,
+    previewRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    previewChip: {
+      backgroundColor: colors.inputBg, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5,
+      maxWidth: 150,
     },
-    verBtnTexto: { color: colors.onAccent, fontSize: 13 * fs, fontWeight: '700' },
+    previewChipTexto: { color: colors.textSecondary, fontSize: 11.5 * fs, fontWeight: '600' },
+    previewMas: { color: colors.textMuted, fontSize: 11.5 * fs, fontWeight: '700' },
+    iniciarBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 12,
+    },
+    iniciarBtnTexto: { color: colors.onAccent, fontSize: 15 * fs, fontWeight: '700' },
     diaVacio:      { alignItems: 'center', gap: 8, paddingVertical: 16 },
     diaVacioTexto: { color: colors.textMuted, fontSize: 13 * fs, textAlign: 'center' },
     accesosRow: { flexDirection: 'row', gap: 10 },
     accesoCard: {
-      flex: 1, alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 14,
-      borderWidth: 1, borderColor: colors.border, paddingVertical: 16, paddingHorizontal: 8,
+      flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: colors.card, borderRadius: 14,
+      borderWidth: 1, borderColor: colors.border, paddingVertical: 18, paddingHorizontal: 8,
     },
-    accesoDeshabilitado: { opacity: 0.75 },
+    accesoDeshabilitado: { opacity: 0.75, position: 'relative' },
     accesoTexto: { color: colors.text, fontSize: 11.5 * fs, fontWeight: '600', textAlign: 'center' },
-    proximamenteBadge: {
-      backgroundColor: colors.warning + '22', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, marginTop: 2,
+    candadoBadge: {
+      position: 'absolute', top: 8, right: 8,
+      width: 18, height: 18, borderRadius: 9,
+      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
     },
-    proximamenteTexto: { color: colors.warning, fontSize: 9.5 * fs, fontWeight: '700' },
   });
 }
