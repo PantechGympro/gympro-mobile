@@ -4,11 +4,23 @@ Aplicación móvil de GymPro para Android, construida con React Native y Expo
 (enrutamiento con expo-router). Consume la misma API REST que el portal web y ofrece la
 experiencia orientada al uso diario de miembros, entrenadores, recepción y propietarios.
 
-> **Arquitectura multi-repo:** este repo es parte de GymPro, dividido en 3 repos bajo la
-> organización [PantechGympro](https://github.com/PantechGympro):
+> **Arquitectura multi-repo:** este repo es parte de GymPro, repartido en cuatro
+> repositorios bajo la organización [PantechGympro](https://github.com/PantechGympro):
 > [`gympro-api`](https://github.com/PantechGympro/gympro-api),
-> [`gympro-web`](https://github.com/PantechGympro/gympro-web) y
-> [`gympro-mobile`](https://github.com/PantechGympro/gympro-mobile) (este).
+> [`gympro-web`](https://github.com/PantechGympro/gympro-web),
+> [`gympro-mobile`](https://github.com/PantechGympro/gympro-mobile) (este) e
+> [`gympro-infra`](https://github.com/PantechGympro/gympro-infra),
+> que contiene los `docker-compose*.yml` y la configuración de nginx.
+>
+> Para levantar el stack completo se clonan como carpetas hermanas y se ejecuta
+> `docker compose` desde `gympro-infra/`:
+>
+> ```
+> proyectos/
+> ├── gympro-api/
+> ├── gympro-web/
+> └── gympro-infra/   ← aquí se corre docker compose
+> ```
 
 ---
 
@@ -30,7 +42,6 @@ dispositivo en la misma red.
 ## Ejecución en desarrollo
 
 ```bash
-cd mobile/
 npm install
 
 # Iniciar el bundler de Expo
@@ -38,7 +49,8 @@ npm start          # equivale a: expo start --host lan
 ```
 
 El teléfono y la computadora deben estar en la **misma red WiFi**, y los contenedores
-del backend levantados (`docker compose up -d`), porque la app consume la API en el
+del backend levantados (`docker compose up -d` desde `gympro-infra/`), porque la app
+consume la API en el
 puerto 8080 de esa máquina.
 
 ### Development build (recomendado)
@@ -223,6 +235,56 @@ Guía completa y pasos para añadir una paleta: [docs/SISTEMA-DE-COLOR.md](docs/
 | Almacenamiento seguro | expo-secure-store |
 
 ---
+
+---
+
+## Flujo de trabajo
+
+| Rama | Para qué |
+|---|---|
+| `dev-miguel`, `dev-francisco`, `dev-maximiliano`, `dev-carlos` | Trabajo diario; una por integrante |
+| `main` | Rama integrada. **Protegida**: no admite push directo |
+| `qa` | Verificación antes de preparar la entrega |
+| `staging` | Preproducción |
+| `prod` | Lo que corre en el servidor. **Protegida** |
+
+1. Trabaja en tu rama `dev-<nombre>`; nunca directamente sobre `main`.
+2. Abre un pull request hacia `main` y completa la plantilla
+   (`.github/PULL_REQUEST_TEMPLATE.md`).
+3. La integración continua (`.github/workflows/ci.yml`) debe pasar en verde y el PR
+   necesita la aprobación de otro integrante.
+4. Al fusionar, el workflow `sync-dev-branches.yml` baja `main` a las cuatro ramas
+   `dev-*` automáticamente. Si hay conflicto se detiene y lo reporta; se resuelve a
+   mano:
+
+   ```bash
+   git checkout dev-<nombre>
+   git merge main       # resolver los conflictos
+   git push
+   ```
+
+5. La promoción entre ambientes sigue `main → qa → staging → prod`.
+
+### Convención de commits
+
+Conventional Commits, con alcance opcional entre paréntesis:
+
+| Prefijo | Para qué |
+|---|---|
+| `feat:` | Funcionalidad nueva |
+| `fix:` | Corrección de un bug |
+| `chore:` | Mantenimiento, configuración, dependencias |
+| `docs:` | Solo documentación |
+| `refactor:` | Cambio de estructura sin cambiar comportamiento |
+| `perf:` | Mejora de rendimiento |
+
+Ejemplos: `feat(api): cobro recurrente con Mercado Pago`, `fix(mobile): sesión no se renueva`.
+
+**Nunca se commitean secretos ni archivos `.env`.** El repositorio versiona únicamente
+`.env.example`; los valores reales se mantienen fuera de git.
+
+La documentación del proyecto se lleva en **Jira** (proyecto `SCRUM`): los entregables y
+las decisiones técnicas se adjuntan o se enlazan desde la incidencia que les corresponde.
 
 ## Notas
 
