@@ -5,6 +5,16 @@
  * planes antiguos o los que crea el propio miembro traen `comidas` sueltas.
  * `aplanarDias()` reduce ambos formatos a una lista de días, que es la única
  * forma de que el miembro vea el plan completo venga de donde venga.
+ *
+ * Rediseño UI/UX (este archivo):
+ * - Marcar una comida como "consumida" y el registro de agua son estado
+ *   LOCAL de esta pantalla (useState), no hay endpoint todavía que los
+ *   persista -- se reinician al recargar la app. Se deja así a propósito en
+ *   vez de inventar un contrato de backend: si se quiere que sobreviva
+ *   entre sesiones o se sincronice con el portal web, es un ticket aparte.
+ * - Los íconos por tipo de comida (desayuno/comida/cena) se infieren del
+ *   nombre de la comida (`iconoComida`) -- el backend no manda un tipo
+ *   estructurado, solo el nombre libre que puso el entrenador o el socio.
  */
 import React, { useState, useMemo } from 'react';
 import {
@@ -23,6 +33,36 @@ import DetalleReceta, { macro } from '../../../components/member/DetalleReceta';
 import type { Receta, Dieta, DiaDieta, ComidaDieta } from '../../../types';
 
 type Tab = 'dietas' | 'recetas';
+
+const META_AGUA_L = 3.0;
+const PASO_AGUA_L = 0.25;
+
+// Consejos nutricionales genéricos -- sin backend que los sirva todavía, se
+// rota uno por día (determinístico, mismo tip todo el día) usando el día
+// del año como índice para que no sea siempre el mismo.
+const TIPS_NUTRICION = [
+  'Distribuye tu proteína a lo largo del día en vez de concentrarla en una sola comida: ayuda más a la síntesis muscular.',
+  'El agua cuenta como parte de tu plan: la sed suele confundirse con hambre, sobre todo a media tarde.',
+  'Prioriza alimentos con poco procesamiento cuando puedas elegir: suelen saciar más por la misma cantidad de calorías.',
+  'Comer despacio y sin distracciones ayuda a notar la saciedad antes de terminar el plato.',
+  'La fibra (verduras, legumbres, avena) hace más lenta la digestión y ayuda a mantener la energía estable.',
+  'Planea tu próxima comida con al menos unas horas de anticipación: reduce las decisiones de último momento.',
+];
+function tipDelDia(): string {
+  const inicioAno = new Date(new Date().getFullYear(), 0, 0);
+  const dias = Math.floor((Date.now() - inicioAno.getTime()) / 86400000);
+  return TIPS_NUTRICION[dias % TIPS_NUTRICION.length];
+}
+
+/** Ícono contextual según el nombre de la comida (desayuno/comida/cena/otro). */
+function iconoComida(nombre?: string): React.ComponentProps<typeof Ionicons>['name'] {
+  const n = (nombre ?? '').toLowerCase();
+  if (n.includes('desayuno')) return 'cafe-outline';
+  if (n.includes('cena'))     return 'moon-outline';
+  if (n.includes('snack') || n.includes('colación') || n.includes('colacion')) return 'nutrition-outline';
+  if (n.includes('comida') || n.includes('almuerzo') || n.includes('lunch'))   return 'restaurant-outline';
+  return 'restaurant-outline';
+}
 
 /**
  * Devuelve los días del plan, sea cual sea el formato en que se guardó.
@@ -54,7 +94,7 @@ function aplanarDias(d: Dieta): DiaDieta[] {
   return comidas.length > 0 ? [{ dia: 'Plan diario', comidas }] : [];
 }
 
-/** Línea legible de una comida: lo que se come, sin importar dónde se guardó. */
+/** Lista de alimentos/recetas de una comida, sin importar dónde se guardó. */
 function detalleComida(c: ComidaDieta): string[] {
   const alimentos = toArray<string>(c?.alimentos).map((a) => toStr(a)).filter(Boolean);
   const recetas   = toArray<string>(c?.recetas).map((r) => toStr(r)).filter(Boolean);
@@ -82,6 +122,19 @@ export default function NutritionScreen() {
   const [dietaAbierta,  setDietaAbierta]  = useState<string | null>(null);
   const [recetaAbierta, setRecetaAbierta] = useState<Receta | null>(null);
 
+  // Comidas marcadas como "consumidas" -- estado local, ver nota de
+  // cabecera del archivo. Clave: `${idDieta}-${dia}-${indiceComida}`.
+  const [consumidas, setConsumidas] = useState<Set<string>>(new Set());
+  const toggleConsumida = (key: string) => setConsumidas((prev) => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
+
+  // Registro diario de agua -- estado local, ver nota de cabecera del archivo.
+  const [aguaL, setAguaL] = useState(0);
+  const agregarAgua = (delta: number) => setAguaL((v) => Math.max(0, Math.min(META_AGUA_L * 2, +(v + delta).toFixed(2))));
+
   // SCRUM-168 / HU-30: el plan de nutrición es de los pocos datos que el
   // socio consulta estando ya en el gimnasio (a veces sin señal) — cachear
   // la última respuesta evita una pantalla vacía justo cuando la necesita.
@@ -107,7 +160,7 @@ export default function NutritionScreen() {
       <View style={styles.header}>
         <Text style={styles.title} accessibilityRole="header">Nutrición</Text>
 
-        {/* Tabs */}
+        {/* Segmented control: Planes / Recetas */}
         <View style={styles.tabRow}>
           {(['dietas', 'recetas'] as Tab[]).map((t) => (
             <TouchableOpacity
@@ -133,6 +186,16 @@ export default function NutritionScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loadingD} onRefresh={refetchD} tintColor={colors.accent} />}
         >
+          {/* Tip del día -- aviso destacado, no es un error ni una advertencia:
+              tono informativo propio, no el naranja de warning. */}
+          <View style={styles.tipCard}>
+            <Ionicons name="bulb-outline" size={20} color={colors.info} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tipTitulo}>Tip del día</Text>
+              <Text style={styles.tipTexto}>{tipDelDia()}</Text>
+            </View>
+          </View>
+
           {dietas.length === 0 ? (
             <View style={styles.empty}>
               <Ionicons name="nutrition-outline" size={44} color={colors.textMuted} />
@@ -145,6 +208,7 @@ export default function NutritionScreen() {
               const kcal     = d.calorias_objetivo ?? d.calorias_meta;
               const abierta  = dietaAbierta === d._id;
               const visibles = abierta ? dias : dias.slice(0, 1);
+              const hayMacros = !!(d.proteinas_meta_g || d.carbohidratos_meta_g || d.grasas_meta_g);
 
               return (
                 <Card key={d._id} style={styles.dietCard}>
@@ -157,7 +221,7 @@ export default function NutritionScreen() {
                       <Text style={styles.dietCals}>
                         {[
                           kcal ? `${kcal} kcal / día` : null,
-                          dias.length ? `${dias.length} día(s)` : null,
+                          dias.length ? `${dias.length} ${dias.length === 1 ? 'día' : 'días'}` : null,
                           d.objetivo ? toStr(d.objetivo) : null,
                         ].filter(Boolean).join(' · ')}
                       </Text>
@@ -167,12 +231,15 @@ export default function NutritionScreen() {
                   {!!d.descripcion && <Text style={styles.dietDesc}>{toStr(d.descripcion)}</Text>}
                   {!!d.notas && <Text style={styles.dietDesc}>{toStr(d.notas)}</Text>}
 
-                  {/* Metas de macros, si el entrenador las fijó */}
-                  {(d.proteinas_meta_g || d.carbohidratos_meta_g || d.grasas_meta_g) && (
-                    <View style={styles.macroRow}>
-                      {!!d.proteinas_meta_g     && <MacroPill label="P" value={d.proteinas_meta_g}     color={colors.error}   styles={styles} />}
-                      {!!d.carbohidratos_meta_g && <MacroPill label="C" value={d.carbohidratos_meta_g} color={colors.warning} styles={styles} />}
-                      {!!d.grasas_meta_g        && <MacroPill label="G" value={d.grasas_meta_g}        color={colors.info}    styles={styles} />}
+                  {/* Metas de macronutrientes, si el entrenador las fijó */}
+                  {hayMacros && (
+                    <View>
+                      <Text style={styles.macroRowLabel}>Macronutrientes objetivo</Text>
+                      <View style={styles.macroRow}>
+                        {!!d.proteinas_meta_g     && <MacroPill label="Proteínas"     value={d.proteinas_meta_g}     color={colors.error}   styles={styles} />}
+                        {!!d.carbohidratos_meta_g && <MacroPill label="Carbohidratos" value={d.carbohidratos_meta_g} color={colors.warning} styles={styles} />}
+                        {!!d.grasas_meta_g        && <MacroPill label="Grasas"        value={d.grasas_meta_g}        color={colors.info}    styles={styles} />}
+                      </View>
                     </View>
                   )}
 
@@ -187,22 +254,39 @@ export default function NutritionScreen() {
                           <Text style={styles.diaTitulo}>{toStr(dia.dia, 'Día')}</Text>
                           {toArray<ComidaDieta>(dia.comidas).map((c, i) => {
                             const detalle = detalleComida(c);
+                            const key = `${d._id}-${dia.dia}-${i}`;
+                            const consumida = consumidas.has(key);
                             return (
                               <View key={i} style={styles.mealRow}>
-                                <Ionicons name="restaurant-outline" size={14} color={colors.accent} />
+                                <Ionicons name={iconoComida(c.nombre)} size={16} color={colors.accent} />
                                 <View style={{ flex: 1 }}>
-                                  <Text style={styles.mealName}>
+                                  <Text style={[styles.mealName, consumida && styles.mealNameConsumida]}>
                                     {toStr(c.nombre, 'Comida')}
                                     {c.hora ? <Text style={styles.mealHora}>  {toStr(c.hora)}</Text> : null}
                                   </Text>
                                   {detalle.length > 0 && (
-                                    <Text style={styles.mealDetalle}>{detalle.join(' · ')}</Text>
+                                    <View style={styles.foodChipsRow}>
+                                      {detalle.map((item, iF) => (
+                                        <View key={iF} style={styles.foodChip}>
+                                          <Text style={styles.foodChipTexto}>{item}</Text>
+                                        </View>
+                                      ))}
+                                    </View>
                                   )}
                                   {!!c.notas && <Text style={styles.mealDetalle}>{toStr(c.notas)}</Text>}
                                 </View>
                                 {!!c.calorias && (
                                   <Text style={styles.mealKcal}>{c.calorias} kcal</Text>
                                 )}
+                                <TouchableOpacity
+                                  onPress={() => toggleConsumida(key)}
+                                  style={[styles.checkCircle, consumida && styles.checkCircleActivo]}
+                                  accessibilityRole="checkbox"
+                                  accessibilityState={{ checked: consumida }}
+                                  accessibilityLabel={`Marcar ${toStr(c.nombre, 'comida')} como consumida`}
+                                >
+                                  {consumida && <Ionicons name="checkmark" size={13} color={colors.onAccent} />}
+                                </TouchableOpacity>
                               </View>
                             );
                           })}
@@ -234,6 +318,39 @@ export default function NutritionScreen() {
               );
             })
           )}
+
+          {/* Widget de agua -- registro local del día, ver nota de cabecera. */}
+          <Card style={styles.aguaCard}>
+            <View style={styles.aguaHeader}>
+              <Ionicons name="water-outline" size={20} color={colors.info} />
+              <Text style={styles.aguaTitulo}>Agua de hoy</Text>
+              <Text style={styles.aguaValor}>
+                {aguaL.toFixed(2)} <Text style={styles.aguaMeta}>/ {META_AGUA_L.toFixed(1)} L</Text>
+              </Text>
+            </View>
+            <View style={styles.aguaBarFondo}>
+              <View style={[styles.aguaBarRelleno, { width: `${Math.min(100, (aguaL / META_AGUA_L) * 100)}%` }]} />
+            </View>
+            <View style={styles.aguaBotones}>
+              <TouchableOpacity
+                style={styles.aguaBtn}
+                onPress={() => agregarAgua(-PASO_AGUA_L)}
+                accessibilityRole="button"
+                accessibilityLabel="Quitar un vaso de agua"
+              >
+                <Ionicons name="remove" size={18} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={styles.aguaPaso}>+{PASO_AGUA_L.toFixed(2)} L</Text>
+              <TouchableOpacity
+                style={[styles.aguaBtn, styles.aguaBtnAccent]}
+                onPress={() => agregarAgua(PASO_AGUA_L)}
+                accessibilityRole="button"
+                accessibilityLabel="Agregar un vaso de agua"
+              >
+                <Ionicons name="add" size={18} color={colors.onAccent} />
+              </TouchableOpacity>
+            </View>
+          </Card>
         </ScrollView>
       )}
 
@@ -366,6 +483,15 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   empty:        { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyText:    { color: colors.textMuted, fontSize: 15 * fs, fontWeight: '600', textAlign: 'center' },
   emptyHint:    { color: colors.textMuted, fontSize: 13 * fs, textAlign: 'center' },
+
+  // Tip del día
+  tipCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: colors.infoBg, borderRadius: 14, padding: 14,
+  },
+  tipTitulo: { color: colors.info, fontSize: 12.5 * fs, fontWeight: '700', marginBottom: 2 },
+  tipTexto:  { color: colors.text, fontSize: 12.5 * fs, lineHeight: 18 },
+
   dietCard:     { gap: 10 },
   dietTop:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
   dietIconBox:  { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.successBg, alignItems: 'center', justifyContent: 'center' },
@@ -373,11 +499,22 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   dietCals:     { color: colors.accent, fontSize: 13 * fs },
   dietDesc:     { color: colors.textSecondary, fontSize: 13 * fs, lineHeight: 18 },
   mealList:     { gap: 6, marginTop: 4 },
-  mealRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 5 },
+  mealRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 6 },
   mealName:     { color: colors.text, fontSize: 13 * fs, fontWeight: '600' },
+  mealNameConsumida: { color: colors.textMuted, textDecorationLine: 'line-through' },
   mealHora:     { color: colors.textSecondary, fontSize: 12 * fs, fontWeight: '400' },
   mealDetalle:  { color: colors.textSecondary, fontSize: 12 * fs, marginTop: 2, lineHeight: 17 },
-  mealKcal:     { color: colors.accent, fontSize: 12 * fs, fontWeight: '700' },
+  mealKcal:     { color: colors.accent, fontSize: 12 * fs, fontWeight: '700', marginTop: 2 },
+
+  foodChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
+  foodChip:     { backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  foodChipTexto:{ color: colors.textSecondary, fontSize: 11 * fs, fontWeight: '500' },
+
+  checkCircle: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  checkCircleActivo: { backgroundColor: colors.accent, borderColor: colors.accent },
 
   // Bloque de un día dentro del plan
   diaBloque: {
@@ -400,9 +537,26 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   calBox:       { alignItems: 'flex-end' },
   calNum:       { color: colors.warning, fontSize: 20 * fs, fontWeight: '800' },
   calUnit:      { color: colors.textSecondary, fontSize: 11 * fs },
-  macroRow:     { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 },
-  macroPill:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  macroRowLabel:{ color: colors.textSecondary, fontSize: 11 * fs, fontWeight: '600', marginBottom: 6, marginTop: 2 },
+  macroRow:     { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  macroPill:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   macroLabel:   { fontSize: 11 * fs, fontWeight: '700' },
   macroVal:     { fontSize: 12 * fs, fontWeight: '600' },
+
+  // Widget de agua
+  aguaCard:     { gap: 10 },
+  aguaHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  aguaTitulo:   { color: colors.text, fontSize: 14 * fs, fontWeight: '700', flex: 1 },
+  aguaValor:    { color: colors.info, fontSize: 15 * fs, fontWeight: '800' },
+  aguaMeta:     { color: colors.textSecondary, fontSize: 12 * fs, fontWeight: '600' },
+  aguaBarFondo: { height: 10, borderRadius: 6, backgroundColor: colors.surface, overflow: 'hidden' },
+  aguaBarRelleno: { height: '100%', borderRadius: 6, backgroundColor: colors.info },
+  aguaBotones:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  aguaBtn: {
+    width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
+  },
+  aguaBtnAccent:{ backgroundColor: colors.accent, borderColor: colors.accent },
+  aguaPaso:     { color: colors.textSecondary, fontSize: 12 * fs, fontWeight: '600', minWidth: 60, textAlign: 'center' },
 });
 }
