@@ -1,11 +1,21 @@
 /**
- * Pantalla Membresía — estado actual y apartado de renovación.
+ * Pantalla "Membresía y Pagos" — estado de la membresía, apartado de
+ * renovación y el historial financiero, todo en una sola pantalla.
  *
  * Contratos reales del backend (api/app/routes/miembro/user_membership.py):
  *   GET  /api/user/membership        → { tieneMembresia, membresia?, mensaje? }
  *   GET  /api/user/membership/plans  → { planes: [...] }
  *   POST /api/user/membership/renew  → body { id_membresia, metodo_pago }
  *                                       metodo_pago ∈ Efectivo | PayPal | Mercado Pago
+ *   GET  /api/user/payments          → { stats: {...}, payments: [...] }
+ *
+ * Rediseño: antes "Pagos" era una pantalla propia (payments.tsx), alcanzable
+ * solo con el enlace "Ver historial de pagos" al fondo de esta pantalla. Esa
+ * pantalla ya no existe -- su resumen financiero y su historial de
+ * transacciones se fusionaron aquí abajo tal cual, con el estado (badge de
+ * cada transacción) ahora explícito en vez de texto plano. Toda la lógica de
+ * renovación/pago (carrusel de planes, pasarelas, bloqueo sin conexión por
+ * SCRUM-168/HU-30) se deja exactamente igual: es dinero real, no se toca.
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -13,12 +23,11 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useFontScale } from '../../hooks/useColors';
 import { ENDPOINTS } from '../../constants/Api';
 import { useFetch } from '../../hooks/useFetch';
-import { toDateStr } from '../../utils/format';
+import { toDateStr, toArray } from '../../utils/format';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -30,6 +39,7 @@ import {
 } from '../../services/pagos';
 import type {
   MembershipResponse, PlansResponse, MembershipPlan, MetodoPago,
+  PaymentsResponse, PaymentItem,
 } from '../../types';
 import { estaConectado, useConnectivityStore } from '../../services/offline/connectivity';
 
@@ -39,10 +49,21 @@ const SCREEN_W  = Dimensions.get('window').width;
 const CARD_GAP  = 12;
 const CARD_W    = Math.min(300, SCREEN_W * 0.76);
 
+type FiltroPagos = 'todos' | 'membresia' | 'producto';
+
 function estadoBadge(estado: string): { label: string; color: 'success' | 'warning' | 'error' } {
   if (estado === 'activa')     return { label: 'Activa',     color: 'success' };
   if (estado === 'por_vencer') return { label: 'Por vencer', color: 'warning' };
   return { label: 'Vencida', color: 'error' };
+}
+
+function methodIcon(method: string): React.ComponentProps<typeof Ionicons>['name'] {
+  const m = (method || '').toLowerCase();
+  if (m.includes('paypal'))   return 'logo-paypal';
+  if (m.includes('mercado'))  return 'wallet-outline';
+  if (m.includes('tarjeta'))  return 'card-outline';
+  if (m.includes('transfer')) return 'swap-horizontal-outline';
+  return 'cash-outline';
 }
 
 export default function MembershipScreen() {
@@ -57,6 +78,8 @@ export default function MembershipScreen() {
   const { data, loading, refetch } =
     useFetch<MembershipResponse>(ENDPOINTS.USER_MEMBERSHIP, undefined, { cache: true });
   const { data: plansData, loading: loadingPlans } = useFetch<PlansResponse>(ENDPOINTS.MEMBERSHIP_PLANS);
+  const { data: pagosData, loading: loadingPagos, refetch: refetchPagos } =
+    useFetch<PaymentsResponse>(ENDPOINTS.USER_PAYMENTS);
   const conectado = useConnectivityStore((s) => s.conectado);
 
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null);
@@ -65,6 +88,7 @@ export default function MembershipScreen() {
   const [showRenew, setShowRenew] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [indiceActivo, setIndiceActivo] = useState(0);   // posición en el carrusel
+  const [filtroPagos, setFiltroPagos] = useState<FiltroPagos>('todos');
   // Efectivo + las pasarelas activas del gimnasio (PayPal / Mercado Pago)
   const [pasarelas, setPasarelas] = useState<MetodoPagoDisponible[]>([]);
   // HU-30: si falla por falta de red (no hubo respuesta del servidor), los
@@ -101,6 +125,12 @@ export default function MembershipScreen() {
 
   const planes = plansData?.planes ?? [];
 
+  // ── Historial de pagos (antes app/(member)/payments.tsx) ────────────────
+  const statsPagos     = pagosData?.stats;
+  const todosPagos      = toArray<PaymentItem>(pagosData?.payments);
+  const pagosFiltrados  = filtroPagos === 'todos' ? todosPagos : todosPagos.filter((p) => p.type === filtroPagos);
+  const hayComprasPOS   = todosPagos.some((p) => p.type === 'producto');
+
   // SCRUM-168 / HU-30: renovar es un movimiento de dinero (incluso en
   // "Efectivo" — activa la membresía de inmediato) y el ticket exige que
   // NINGÚN movimiento de dinero quede en cola. Se bloquea por completo sin
@@ -124,6 +154,7 @@ export default function MembershipScreen() {
       setShowRenew(false);
       setSelectedPlan(null);
       refetch();
+      refetchPagos();
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.error ?? 'No se pudo renovar la membresía');
     } finally {
@@ -156,6 +187,7 @@ export default function MembershipScreen() {
         setShowRenew(false);
         setSelectedPlan(null);
         refetch();
+        refetchPagos();
       }
     } catch (e: any) {
       Alert.alert('No se pudo iniciar el pago',
@@ -196,13 +228,17 @@ export default function MembershipScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.accent} />}
     >
-      <Text style={styles.title} accessibilityRole="header">Mi Membresía</Text>
+      <Text style={styles.title} accessibilityRole="header">Membresía y Pagos</Text>
 
-      {/* ── Estado actual ─────────────────────────────────────── */}
+      {/* ── Pase de membresía (hero) ──────────────────────────────── */}
       {membership ? (
-        <Card elevated>
+        <Card elevated style={styles.pase}>
           <View style={styles.memHeader}>
             <View style={{ flex: 1 }}>
+              <View style={styles.paseTag}>
+                <Ionicons name="ticket-outline" size={12} color={colors.accent} />
+                <Text style={styles.paseTagText}>PASE DE MEMBRESÍA</Text>
+              </View>
               <Text style={styles.memName}>{membership.nombre}</Text>
               <Text style={styles.memPrice}>${membership.precio} <Text style={styles.memPriceUnit}>/ periodo</Text></Text>
             </View>
@@ -213,6 +249,10 @@ export default function MembershipScreen() {
             <Text style={styles.daysNum}>{Math.max(0, membership.diasRestantes)}</Text>
             <Text style={styles.daysLabel}>días restantes</Text>
           </View>
+
+          {/* Línea perforada -- refuerza la idea de "pase/boleto" entre el
+              bloque de días y las fechas, como el talón de un ticket. */}
+          <View style={styles.perforacion} />
 
           <View style={styles.datesRow}>
             <View style={styles.dateCol}>
@@ -243,7 +283,7 @@ export default function MembershipScreen() {
         </Card>
       )}
 
-      {/* ── Botón abrir/cerrar apartado de renovación ─────────── */}
+      {/* ── Botón abrir/cerrar apartado de renovación (justo debajo del pase) ── */}
       <Button
         label={showRenew ? 'Cerrar' : (membership ? 'Renovar membresía' : 'Contratar plan')}
         variant={showRenew ? 'secondary' : 'primary'}
@@ -462,17 +502,148 @@ export default function MembershipScreen() {
         </Card>
       )}
 
-      {/* ── Acceso al historial de pagos ──────────────────────── */}
-      <TouchableOpacity
-        style={styles.linkRow}
-        onPress={() => router.push('/(member)/payments')}
-        accessibilityRole="button"
-        accessibilityLabel="Ver historial de pagos"
-      >
-        <Ionicons name="receipt-outline" size={18} color={colors.accent} />
-        <Text style={styles.linkText}>Ver historial de pagos</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+      {/* ── Resumen financiero ─────────────────────────────────── */}
+      {statsPagos && (
+        <>
+          <Text style={styles.sectionTitleBloque}>Resumen financiero</Text>
+          <View style={styles.grid2x2}>
+            <Card style={styles.miniCard} padding={14}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.dataProgreso} />
+              <Text style={styles.miniLabel}>Último pago</Text>
+              <Text style={styles.miniValue}>{statsPagos.lastPayment}</Text>
+            </Card>
+            <Card style={styles.miniCard} padding={14}>
+              <Ionicons name="calendar-outline" size={18} color={colors.dataAtencion} />
+              <Text style={styles.miniLabel}>Próximo pago</Text>
+              <Text style={styles.miniValue}>{statsPagos.nextPayment}</Text>
+            </Card>
+            <Card style={styles.miniCard} padding={14}>
+              <Ionicons
+                name={statsPagos.status === 'Al día' ? 'shield-checkmark-outline' : 'alert-circle-outline'}
+                size={18}
+                color={statsPagos.status === 'Al día' ? colors.success : colors.warning}
+              />
+              <Text style={styles.miniLabel}>Estado</Text>
+              <Badge
+                label={statsPagos.status}
+                color={statsPagos.status === 'Al día' ? 'success' : 'warning'}
+                style={{ marginTop: 4 }}
+              />
+            </Card>
+            <Card style={styles.miniCard} padding={14}>
+              <Ionicons name="wallet-outline" size={18} color={colors.accent} />
+              <Text style={styles.miniLabel}>Total invertido</Text>
+              <Text style={styles.miniValue}>${statsPagos.totalPaid.toLocaleString('es-MX')}</Text>
+              {(statsPagos.totalCompras ?? 0) > 0 && (
+                <View style={styles.desglose}>
+                  <View style={styles.desgloseItem}>
+                    <View style={[styles.desglosePunto, { backgroundColor: colors.dataProgreso }]} />
+                    <Text style={styles.desgloseText}>
+                      Membresías ${Number(statsPagos.totalMembresias ?? 0).toLocaleString('es-MX')}
+                    </Text>
+                  </View>
+                  <View style={styles.desgloseItem}>
+                    <View style={[styles.desglosePunto, { backgroundColor: colors.dataActividad }]} />
+                    <Text style={styles.desgloseText}>
+                      Compras ${Number(statsPagos.totalCompras ?? 0).toLocaleString('es-MX')}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Card>
+          </View>
+        </>
+      )}
+
+      {/* ── Historial de transacciones ─────────────────────────── */}
+      {loadingPagos ? (
+        <LoadingSpinner message="Cargando historial de pagos…" />
+      ) : (
+        <Card>
+          <Text style={styles.sectionTitle}>Historial de transacciones</Text>
+
+          {/* El filtro solo aparece si hay algo que separar */}
+          {hayComprasPOS && (
+            <View style={styles.filtros}>
+              {([
+                { id: 'todos',      etiqueta: 'Todo'        },
+                { id: 'membresia',  etiqueta: 'Membresías'  },
+                { id: 'producto',   etiqueta: 'Compras'     },
+              ] as { id: FiltroPagos; etiqueta: string }[]).map((f) => (
+                <TouchableOpacity
+                  key={f.id}
+                  style={[styles.filtroChip, filtroPagos === f.id && styles.filtroActivo]}
+                  onPress={() => setFiltroPagos(f.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: filtroPagos === f.id }}
+                  accessibilityLabel={`Ver ${f.etiqueta}`}
+                >
+                  <Text style={[styles.filtroText, filtroPagos === f.id && styles.filtroTextActivo]}>
+                    {f.etiqueta}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {pagosFiltrados.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="receipt-outline" size={40} color={colors.textMuted} />
+              <Text style={styles.emptyText}>
+                {filtroPagos === 'producto'  ? 'Aún no has comprado nada en el gimnasio.'
+                 : filtroPagos === 'membresia' ? 'Aún no tienes pagos de membresía.'
+                 : 'Aún no tienes pagos registrados.'}
+              </Text>
+            </View>
+          ) : (
+            pagosFiltrados.map((p) => {
+              const esCompra = p.type === 'producto';
+              return (
+                <View key={p.id} style={styles.payRow}>
+                  <View style={[
+                    styles.payIcon,
+                    { backgroundColor: esCompra ? colors.dataActividadBg : colors.dataProgresoBg },
+                  ]}>
+                    <Ionicons
+                      name={methodIcon(p.method)}
+                      size={18}
+                      color={esCompra ? colors.dataActividad : colors.dataProgreso}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.conceptoRow}>
+                      <Text style={styles.payConcept} numberOfLines={1}>{p.concept}</Text>
+                      <View style={[
+                        styles.tipoPill,
+                        { backgroundColor: esCompra ? colors.dataActividadBg : colors.dataProgresoBg },
+                      ]}>
+                        <Text style={[
+                          styles.tipoText,
+                          { color: esCompra ? colors.dataActividad : colors.dataProgreso },
+                        ]}>
+                          {esCompra ? 'Compra' : 'Membresía'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.payMeta}>
+                      {p.date}  ·  {p.method}
+                      {esCompra && p.items ? `  ·  ${p.items} art.` : ''}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.payAmount}>${p.amount.toLocaleString('es-MX')}</Text>
+                    <Badge
+                      label={p.status}
+                      color={p.status === 'Completado' ? 'success' : 'warning'}
+                      style={styles.payStatusBadge}
+                    />
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </Card>
+      )}
 
       <View style={styles.infoRow}>
         <Ionicons name="shield-checkmark-outline" size={16} color={colors.success} />
@@ -488,6 +659,10 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     content: { padding: 20, gap: 16, paddingBottom: 32 },
     title:   { color: colors.text, fontSize: 26 * fs, fontWeight: '700' },
 
+    // ── Pase de membresía ────────────────────────────────────────────────
+    pase:      { borderLeftWidth: 4, borderLeftColor: colors.accent },
+    paseTag:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+    paseTagText: { color: colors.accent, fontSize: 10 * fs, fontWeight: '800', letterSpacing: 0.6 },
     memHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
     memName:   { color: colors.text, fontSize: 18 * fs, fontWeight: '700' },
     memPrice:  { color: colors.accent, fontSize: 16 * fs, fontWeight: '700', marginTop: 2 },
@@ -495,8 +670,11 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     daysBox:   { alignItems: 'center', paddingVertical: 16 },
     daysNum:   { color: colors.text, fontSize: 44 * fs, fontWeight: '800', lineHeight: 48 * fs },
     daysLabel: { color: colors.textSecondary, fontSize: 13 * fs },
-    datesRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                 borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+    perforacion: {
+      borderTopWidth: 1.5, borderTopColor: colors.border, borderStyle: 'dashed',
+      marginBottom: 12,
+    },
+    datesRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     dateCol:   { flex: 1 },
     dateLabel: { color: colors.textSecondary, fontSize: 11 * fs },
     dateValue: { color: colors.text, fontSize: 14 * fs, fontWeight: '600', marginTop: 2 },
@@ -508,7 +686,8 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     noMemText:{ color: colors.text, fontSize: 16 * fs, fontWeight: '600' },
     noMemSub: { color: colors.textSecondary, fontSize: 13 * fs, textAlign: 'center' },
 
-    sectionTitle: { color: colors.text, fontSize: 15 * fs, fontWeight: '700', marginBottom: 12 },
+    sectionTitle:       { color: colors.text, fontSize: 15 * fs, fontWeight: '700', marginBottom: 12 },
+    sectionTitleBloque: { color: colors.text, fontSize: 15 * fs, fontWeight: '700' },
     emptyText:    { color: colors.textMuted, fontSize: 13 * fs },
 
     // ── Carrusel de planes ───────────────────────────────────────────────
@@ -591,10 +770,42 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     totalLabel:  { color: colors.textSecondary, fontSize: 14 * fs },
     totalValue:  { color: colors.text, fontSize: 22 * fs, fontWeight: '800' },
 
-    linkRow:  { flexDirection: 'row', alignItems: 'center', gap: 10,
-                backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 14, padding: 16 },
-    linkText: { color: colors.text, fontSize: 14 * fs, fontWeight: '600', flex: 1 },
+    // ── Resumen financiero (grid 2x2) ────────────────────────────────────
+    grid2x2:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    miniCard:  { flexBasis: '47%', flexGrow: 1, gap: 4 },
+    miniLabel: { color: colors.textSecondary, fontSize: 11 * fs, marginTop: 4 },
+    miniValue: { color: colors.text, fontSize: 14 * fs, fontWeight: '700' },
+
+    desglose:      { flexDirection: 'column', gap: 4, marginTop: 8 },
+    desgloseItem:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    desglosePunto: { width: 7, height: 7, borderRadius: 4 },
+    desgloseText:  { color: colors.textSecondary, fontSize: 11 * fs },
+
+    // ── Historial de transacciones ───────────────────────────────────────
+    filtros:    { flexDirection: 'row', gap: 8, marginBottom: 14 },
+    filtroChip: {
+      paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20,
+      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    },
+    filtroActivo:     { backgroundColor: colors.accentBg, borderColor: colors.accent },
+    filtroText:       { color: colors.textSecondary, fontSize: 12.5 * fs, fontWeight: '600' },
+    filtroTextActivo: { color: colors.accent, fontWeight: '700' },
+
+    conceptoRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    tipoPill:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+    tipoText:    { fontSize: 10 * fs, fontWeight: '700' },
+
+    empty:     { alignItems: 'center', paddingVertical: 24, gap: 10 },
+
+    payRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: colors.border },
+    // El fondo del icono lo pone el tipo de pago (membresía o compra).
+    payIcon: { width: 38, height: 38, borderRadius: 12,
+               alignItems: 'center', justifyContent: 'center' },
+    payConcept: { color: colors.text, fontSize: 14 * fs, fontWeight: '600', flexShrink: 1 },
+    payMeta:    { color: colors.textSecondary, fontSize: 12 * fs, marginTop: 2 },
+    payAmount:  { color: colors.text, fontSize: 15 * fs, fontWeight: '700' },
+    payStatusBadge: { marginTop: 4 },
 
     infoRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
     infoText: { color: colors.textMuted, fontSize: 12 * fs },
