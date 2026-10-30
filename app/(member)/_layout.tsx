@@ -1,6 +1,6 @@
 import React from 'react';
 import { Drawer } from 'expo-router/drawer';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { getFocusedRouteNameFromRoute } from 'expo-router/react-navigation';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '../../hooks/useColors';
 import CustomDrawer from '../../components/navigation/CustomDrawer';
