@@ -7,6 +7,18 @@
  *   PUT  /api/user/health/medical    → actualiza info médica (condiciones, alergias, …)
  *
  * Todas las métricas y la información médica son editables desde la app.
+ *
+ * Rediseño UI/UX (este archivo):
+ * - El bloque "Perfil de entrenamiento" se quitó de aquí: esos campos
+ *   (objetivo, nivel de actividad, experiencia, horas de sueño) ya viven en
+ *   Mi Perfil (app/(member)/(tabs)/profile.tsx) -- estaba duplicado.
+ * - La clasificación del IMC ("Sobrepeso leve", etc.) se calcula aquí mismo
+ *   con las bandas estándar de la OMS para adultos; el backend solo manda
+ *   `estado` (bajo/normal/alto/muy_alto) y el valor numérico, no una
+ *   etiqueta clínica, así que `imcClasificacion()` la deriva del valor.
+ *   Es orientativo (no aplica a embarazo, menores, atletas con alta masa
+ *   muscular, etc.), igual que el aviso que ya existe en la pantalla de
+ *   predicción de peso.
  */
 import React, { useState, useMemo } from 'react';
 import {
@@ -49,6 +61,37 @@ function esIndicadorClave(nombre: string): boolean {
   return n.includes('imc') || n.includes('peso') || n === 'estatura';
 }
 
+/**
+ * Ícono "físico" por indicador -- Peso y Estatura dejan de compartir el
+ * check/alerta genérico de `condIcon` y pasan a representar el instrumento
+ * (báscula / cinta métrica); el IMC conserva el ícono de estado porque ahí
+ * SÍ importa saber si está en rango de un vistazo, y además ya lleva al
+ * lado la clasificación en texto (ver imcClasificacion).
+ */
+function iconoIndicador(nombre: string, estado: string): React.ComponentProps<typeof Ionicons>['name'] {
+  const n = nombre.toLowerCase();
+  if (n.includes('peso')) return 'scale-outline';
+  if (n === 'estatura')   return 'resize-outline';
+  return condIcon(estado);
+}
+
+/**
+ * Clasificación clínica del IMC para adultos (bandas OMS, con el rango de
+ * sobrepeso tratado como "leve" frente a los grados de obesidad que siguen
+ * -- mismo criterio en espíritu que el aviso de la pantalla de predicción
+ * de peso). Devuelve null si el valor no es un número parseable.
+ */
+function imcClasificacion(valorTexto: string): string | null {
+  const v = parseFloat(valorTexto);
+  if (!Number.isFinite(v)) return null;
+  if (v < 18.5) return 'Bajo peso';
+  if (v < 25)   return 'Peso normal';
+  if (v < 30)   return 'Sobrepeso leve';
+  if (v < 35)   return 'Obesidad grado I';
+  if (v < 40)   return 'Obesidad grado II';
+  return 'Obesidad grado III';
+}
+
 // Campos de medidas que admite POST /api/user/health (label → clave backend)
 const MEASURE_FIELDS: { key: string; label: string; ph: string }[] = [
   { key: 'peso',                  label: 'Peso (kg) *',            ph: '72.5' },
@@ -64,11 +107,11 @@ const MEASURE_FIELDS: { key: string; label: string; ph: string }[] = [
 ];
 
 type MedicalKey = 'condiciones' | 'alergias' | 'medicamentos' | 'lesiones';
-const MEDICAL_GROUPS: { key: MedicalKey; title: string; color: BadgeColor }[] = [
-  { key: 'condiciones',  title: 'Condiciones médicas', color: 'warning' },
-  { key: 'alergias',     title: 'Alergias',            color: 'error' },
-  { key: 'medicamentos', title: 'Medicamentos',        color: 'info' },
-  { key: 'lesiones',     title: 'Lesiones previas',    color: 'warning' },
+const MEDICAL_GROUPS: { key: MedicalKey; title: string; color: BadgeColor; emptyLabel: string }[] = [
+  { key: 'condiciones',  title: 'Condiciones médicas', color: 'warning', emptyLabel: 'Sin condiciones médicas registradas' },
+  { key: 'alergias',     title: 'Alergias',            color: 'error',   emptyLabel: 'Sin alergias registradas' },
+  { key: 'medicamentos', title: 'Medicamentos',        color: 'info',    emptyLabel: 'Sin medicamentos registrados' },
+  { key: 'lesiones',     title: 'Lesiones previas',    color: 'warning', emptyLabel: 'Sin lesiones registradas' },
 ];
 
 type Medical = Record<MedicalKey, string[]>;
@@ -167,6 +210,10 @@ export default function HealthScreen() {
   const condiciones = toArray<HealthCondition>(data?.condiciones);
   const claves   = condiciones.filter(c => esIndicadorClave(c.nombre));
   const medidas  = condiciones.filter(c => !esIndicadorClave(c.nombre));
+  // Más de 4 medidas (p. ej. con pecho/brazos/muslos ya registrados): 3
+  // columnas en vez de 2, para que el grid no se vea interminable y
+  // aproveche mejor el ancho con "más métricas" a la vez.
+  const medidasColAncho = medidas.length > 4 ? '31%' : '47%';
 
   const medicas      = toArray<string>(data?.condicionesMedicas);
   const alergias     = toArray<string>(data?.alergias);
@@ -174,11 +221,13 @@ export default function HealthScreen() {
   const lesiones     = toArray<string>(data?.lesiones);
   const hayMedicos = medicas.length + alergias.length + medicamentos.length + lesiones.length > 0;
 
-  const chipGroup = (title: string, items: string[], color: BadgeColor) => (
+  const chipGroup = (title: string, items: string[], color: BadgeColor, emptyLabel: string) => (
     <View style={styles.chipBlock}>
       <Text style={styles.chipBlockTitle}>{title}</Text>
       {items.length === 0 ? (
-        <Text style={styles.chipEmpty}>Ninguna registrada</Text>
+        <View style={styles.chipVacio}>
+          <Text style={styles.chipVacioTexto}>{emptyLabel}</Text>
+        </View>
       ) : (
         <View style={styles.chipsRow}>
           {items.map((it, i) => (
@@ -223,11 +272,18 @@ export default function HealthScreen() {
           <View style={styles.keyRow}>
             {claves.map((c, i) => {
               const col = estadoColor(c.estado);
+              const esImc = c.nombre.toLowerCase().includes('imc');
+              const clasificacion = esImc ? imcClasificacion(c.valor) : null;
               return (
                 <View key={i} style={[styles.keyCard, { borderColor: colors[col] }]}>
-                  <Ionicons name={condIcon(c.estado)} size={18} color={colors[col]} />
+                  <Ionicons name={iconoIndicador(c.nombre, c.estado)} size={18} color={colors[col]} />
                   <Text style={styles.keyValue}>{c.valor}</Text>
                   <Text style={styles.keyLabel} numberOfLines={2}>{c.nombre.replace(/\s*\(.*\)/, '')}</Text>
+                  {!!clasificacion && (
+                    <View style={[styles.claveBadge, { backgroundColor: colors[`${col}Bg` as keyof typeof colors] as string }]}>
+                      <Text style={[styles.claveBadgeTexto, { color: colors[col] }]}>{clasificacion}</Text>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -250,7 +306,7 @@ export default function HealthScreen() {
         ) : (
           <View style={styles.grid}>
             {medidas.map((c, i) => (
-              <View key={i} style={styles.measCard}>
+              <View key={i} style={[styles.measCard, { width: medidasColAncho }]}>
                 <Text style={styles.measValue}>{c.valor}</Text>
                 <Text style={styles.measLabel} numberOfLines={2}>{c.nombre}</Text>
               </View>
@@ -258,17 +314,6 @@ export default function HealthScreen() {
           </View>
         )}
       </Card>
-
-      {/* Perfil de entrenamiento */}
-      {(data?.objetivo || data?.nivelActividad || data?.nivelExperiencia || data?.horasSueno) && (
-        <Card>
-          <Text style={styles.sectionTitle}>Perfil de entrenamiento</Text>
-          {!!data?.objetivo && <Row label="Objetivo" value={String(data.objetivo)} styles={styles} />}
-          {!!data?.nivelActividad && <Row label="Nivel de actividad" value={String(data.nivelActividad)} styles={styles} />}
-          {!!data?.nivelExperiencia && <Row label="Experiencia" value={String(data.nivelExperiencia)} styles={styles} />}
-          {!!data?.horasSueno && <Row label="Horas de sueño" value={String(data.horasSueno)} styles={styles} />}
-        </Card>
-      )}
 
       {/* Información médica (editable) */}
       <Card>
@@ -280,10 +325,11 @@ export default function HealthScreen() {
             <Text style={styles.editLinkText}>Editar</Text>
           </TouchableOpacity>
         </View>
-        {chipGroup('Condiciones médicas', medicas, 'warning')}
-        {chipGroup('Alergias', alergias, 'error')}
-        {chipGroup('Medicamentos', medicamentos, 'info')}
-        {chipGroup('Lesiones previas', lesiones, 'warning')}
+        {MEDICAL_GROUPS.map(({ key, title, color, emptyLabel }) => {
+          const items = key === 'condiciones' ? medicas : key === 'alergias' ? alergias
+                      : key === 'medicamentos' ? medicamentos : lesiones;
+          return chipGroup(title, items, color, emptyLabel);
+        })}
         {!hayMedicos && (
           <Text style={styles.chipEmpty}>Sin información médica registrada. Toca “Editar” para añadirla.</Text>
         )}
@@ -391,15 +437,6 @@ export default function HealthScreen() {
   );
 }
 
-function Row({ label, value, styles }: { label: string; value: string; styles: ReturnType<typeof make_styles> }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
-
 /** Editor de etiquetas: input + botón añadir, chips removibles con la X. */
 function ChipEditor({
   title, items, onChange, color, styles, colors,
@@ -472,6 +509,8 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
                 padding: 14, gap: 4, alignItems: 'flex-start' },
     keyValue: { color: colors.text, fontSize: 19 * fs, fontWeight: '800', marginTop: 4 },
     keyLabel: { color: colors.textSecondary, fontSize: 11 * fs },
+    claveBadge:       { borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, marginTop: 4, alignSelf: 'flex-start' },
+    claveBadgeTexto:  { fontSize: 10 * fs, fontWeight: '700' },
 
     cardHead:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     sectionTitle: { color: colors.text, fontSize: 15 * fs, fontWeight: '700' },
@@ -479,7 +518,7 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     editLinkText: { color: colors.accent, fontSize: 13 * fs, fontWeight: '600' },
 
     grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    measCard: { width: '47%', backgroundColor: colors.surface, borderRadius: 12, padding: 12, gap: 2 },
+    measCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 12, gap: 2 },
     measValue:{ color: colors.text, fontSize: 17 * fs, fontWeight: '700' },
     measLabel:{ color: colors.textSecondary, fontSize: 11 * fs },
 
@@ -496,6 +535,10 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     chipEditable:   { paddingRight: 6 },
     chipText:       { fontSize: 12 * fs, fontWeight: '600' },
     chipEmpty:      { color: colors.textMuted, fontSize: 12 * fs, fontStyle: 'italic' },
+    // Estado vacío por grupo médico: chip en gris claro (mejor contraste que
+    // el texto en cursiva que había antes) en vez de una frase suelta.
+    chipVacio:      { backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+    chipVacioTexto: { color: colors.textSecondary, fontSize: 12 * fs, fontWeight: '500' },
     chipInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
     chipAddBtn:     { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.accent,
                       alignItems: 'center', justifyContent: 'center' },

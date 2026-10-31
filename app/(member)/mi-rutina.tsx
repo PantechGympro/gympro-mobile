@@ -3,7 +3,7 @@
  *
  * Antes esta pantalla solo mostraba las rutinas PROPIAS del socio (crearlas,
  * editarlas, borrarlas). El nuevo Paso A de Entrenamiento (ver
- * app/(member)/training.tsx) la convierte en "Mi Biblioteca": añade un
+ * app/(member)/(tabs)/training.tsx) la convierte en "Mi Biblioteca": añade un
  * segundo tab de solo lectura con las rutinas ASIGNADAS por el entrenador
  * (antes vivían en el tab "Mi Rutina" de training.tsx), para que el socio
  * vea en un solo lugar "rutinas hechas por el usuario o por el entrenador",

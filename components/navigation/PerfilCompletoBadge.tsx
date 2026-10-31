@@ -37,10 +37,10 @@ type ProfileCompletion = { porcentaje: number; completo: boolean; bloques: Bloqu
 // comparten destino porque se editan en la misma pantalla (p. ej. Salud
 // agrupa medidas + información médica en un solo lugar).
 const RUTA_POR_CAMPO: Record<string, string> = {
-  nombre: '/(member)/profile', telefono: '/(member)/profile',
-  fecha_nacimiento: '/(member)/profile', foto: '/(member)/profile',
-  objetivo: '/(member)/profile', disponibilidad: '/(member)/profile',
-  unidad_medida: '/(member)/profile',
+  nombre: '/(member)/(tabs)/profile', telefono: '/(member)/(tabs)/profile',
+  fecha_nacimiento: '/(member)/(tabs)/profile', foto: '/(member)/(tabs)/profile',
+  objetivo: '/(member)/(tabs)/profile', disponibilidad: '/(member)/(tabs)/profile',
+  unidad_medida: '/(member)/(tabs)/profile',
   peso: '/(member)/health', estatura: '/(member)/health', medidas: '/(member)/health',
   condiciones: '/(member)/health', lesiones: '/(member)/health',
   contacto_emergencia: '/(member)/health',
@@ -78,7 +78,7 @@ export default function PerfilCompletoBadge() {
 
   const irA = (campo: string) => {
     setAbierto(false);
-    router.push((RUTA_POR_CAMPO[campo] ?? '/(member)/profile') as any);
+    router.push((RUTA_POR_CAMPO[campo] ?? '/(member)/(tabs)/profile') as any);
   };
 
   return (
