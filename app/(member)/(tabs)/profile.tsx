@@ -9,16 +9,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 // LinearGradient eliminado — puede fallar en Fabric (new arch) antes de registrarse
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors, useFontScale } from '../../hooks/useColors';
-import { ENDPOINTS, API_BASE_URL } from '../../constants/Api';
-import { useFetch } from '../../hooks/useFetch';
-import { useAuth } from '../../hooks/useAuth';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import SelectorFecha from '../../components/ui/SelectorFecha';
-import api from '../../services/api';
-import AccessibilityPanel from '../../components/settings/AccessibilityPanel';
+import { useColors, useFontScale } from '../../../hooks/useColors';
+import { ENDPOINTS, API_BASE_URL } from '../../../constants/Api';
+import { useFetch } from '../../../hooks/useFetch';
+import { useAuth } from '../../../hooks/useAuth';
+import LoadingSpinner from '../../../components/ui/LoadingSpinner';
+import Card from '../../../components/ui/Card';
+import Button from '../../../components/ui/Button';
+import SelectorFecha from '../../../components/ui/SelectorFecha';
+import api from '../../../services/api';
+import AccessibilityPanel from '../../../components/settings/AccessibilityPanel';
 import * as Haptics from 'expo-haptics';
 
 /**

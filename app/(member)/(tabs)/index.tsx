@@ -9,19 +9,19 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useColors, useFontScale } from '../../hooks/useColors';
-import { useFetch } from '../../hooks/useFetch';
-import { useAuth } from '../../hooks/useAuth';
-import { toFirstName } from '../../utils/format';
-import { ENDPOINTS } from '../../constants/Api';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import KPICard from '../../components/member/KPICard';
-import MembershipCard from '../../components/member/MembershipCard';
-import WorkoutRow from '../../components/member/WorkoutRow';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import type { DashboardData, Exercise } from '../../types';
-import { refreshMemberReminders } from '../../services/reminders';
+import { useColors, useFontScale } from '../../../hooks/useColors';
+import { useFetch } from '../../../hooks/useFetch';
+import { useAuth } from '../../../hooks/useAuth';
+import { toFirstName } from '../../../utils/format';
+import { ENDPOINTS } from '../../../constants/Api';
+import LoadingSpinner from '../../../components/ui/LoadingSpinner';
+import KPICard from '../../../components/member/KPICard';
+import MembershipCard from '../../../components/member/MembershipCard';
+import WorkoutRow from '../../../components/member/WorkoutRow';
+import Card from '../../../components/ui/Card';
+import Button from '../../../components/ui/Button';
+import type { DashboardData, Exercise } from '../../../types';
+import { refreshMemberReminders } from '../../../services/reminders';
 
 export default function MemberDashboard() {
   const colors = useColors();

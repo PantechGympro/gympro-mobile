@@ -1,7 +1,7 @@
 /**
  * checkin-qr.tsx — Check-in del miembro escaneando el QR general del
  * gimnasio (reemplaza el botón de auto-registro sin verificación que
- * antes vivía en el dashboard: ver (member)/index.tsx).
+ * antes vivía en el dashboard: ver (member)/(tabs)/index.tsx).
  *
  * El recepcionista muestra en su pantalla un código que cambia solo cada
  * ~50-60s (ver web/.../ReceptionistCheckin.jsx y
