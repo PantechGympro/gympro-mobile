@@ -104,6 +104,7 @@ export const ENDPOINTS = {
   USER_HEALTH_MEDICAL:'/user/health/medical',    // PUT /api/user/health/medical (info médica)
   MEMBERSHIP_PAYMENT_METHODS: '/user/membership/payment-methods', // GET métodos recientes
   PROFILE_COMPLETION: '/user/profile-completion', // GET SCRUM-102: % de perfil + pendientes por bloque
+  LOGROS:             '/user/logros',            // GET /api/user/logros (HU-26 / SCRUM-206: logros, rangos y medallas)
 
   // Nutrición
   DIETAS:             '/user/nutrition/dietas',  // GET /api/user/nutrition/dietas

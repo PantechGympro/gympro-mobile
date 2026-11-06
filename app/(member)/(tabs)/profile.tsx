@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 // LinearGradient eliminado — puede fallar en Fabric (new arch) antes de registrarse
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useColors, useFontScale } from '../../../hooks/useColors';
 import { ENDPOINTS, API_BASE_URL } from '../../../constants/Api';
 import { useFetch } from '../../../hooks/useFetch';
@@ -242,6 +243,18 @@ export default function ProfileScreen() {
               <Text style={styles.statBoxLabel}>Meses activo</Text>
             </View>
           </View>
+        </Card>
+
+        {/* Logros y Medallas -- HU-26 / SCRUM-206 */}
+        <Card>
+          <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/(member)/logros')}
+            accessibilityRole="button" accessibilityLabel="Ver tus logros y medallas">
+            <View style={[styles.actionIcon, { backgroundColor: '#FBBF2418' }]}>
+              <Ionicons name="trophy-outline" size={20} color="#FBBF24" />
+            </View>
+            <Text style={styles.actionLabel}>Logros y Medallas</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
         </Card>
 
         {/* Accesibilidad */}

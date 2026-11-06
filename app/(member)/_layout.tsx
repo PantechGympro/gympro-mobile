@@ -51,6 +51,7 @@ const TITULOS_OCULTOS: Record<string, string> = {
   'mi-rutina':   'Mi Biblioteca',
   'workout-log': 'Registrar Entreno',
   'health':      'Salud',
+  'logros':      'Logros y Medallas',
 };
 
 export default function MemberLayout() {
@@ -117,7 +118,7 @@ export default function MemberLayout() {
       ))}
       {([
         'routines', 'chat', 'start-workout', 'checkin-qr', 'mi-rutina', 'workout-log',
-        'health',
+        'health', 'logros',
       ] as const).map((name) => (
         <Drawer.Screen
           key={name}
