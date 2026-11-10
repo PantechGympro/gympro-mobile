@@ -65,6 +65,33 @@ export interface Achievement {
   color:       string;
 }
 
+// ── Logros, rangos y medallas (HU-26 / SCRUM-206) ────────────────────────────
+// Ver GET /api/user/logros (app/routes/miembro/logros.py) -- distinto del
+// `Achievement` de arriba, que es solo el resumen de "recientes" del home.
+export interface Logro {
+  id:               string;
+  familia:          'primera_vez' | 'racha' | 'rutinas' | 'constancia' | 'superacion';
+  nombre:           string;
+  descripcion:      string;
+  icono:            string;
+  nivel:            'bronce' | 'plata' | 'oro' | 'especial';
+  color:            string;
+  objetivo:         number;
+  conseguido:       boolean;
+  fecha_obtencion:  string | null;   // "YYYY-MM-DD" si conseguido
+  progreso:         number | null;   // valor actual de la métrica (null si en_revision)
+  en_revision?:     boolean;
+}
+
+export interface LogrosResponse {
+  logros:  Logro[];
+  resumen: {
+    conseguidos: number;
+    total:       number;
+    siguientes:  Logro[]; // próximo nivel pendiente por cada familia
+  };
+}
+
 export interface Membership {
   plan:           string;
   fecha_fin:      string;
