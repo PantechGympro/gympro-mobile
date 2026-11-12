@@ -22,6 +22,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
+import ChatModeracion, { BloqueoItem } from '../../components/shared/ChatModeracion';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Member {
@@ -85,9 +86,18 @@ export default function TrainerChatScreen() {
     : null;
 
   const chatUrl = memberId ? `${ENDPOINTS.TRAINER_CHAT_BASE}/${memberId}` : '';
-  const { data: chatData, loading: loadingC, refetch: refetchC } =
+  const { data: chatData, loading: loadingC, error: chatError, refetch: refetchC } =
     useFetch<{ mensajes: ChatMsg[] }>(chatUrl);
   const mensajes = toArray(chatData?.mensajes ?? []);
+
+  // HU-12: bloqueos que YO hice -- para marcar al miembro activo como
+  // bloqueado sin depender de adivinar el motivo del 403 de mas arriba.
+  const { data: bloqueosData, refetch: refetchBloqueos } =
+    useFetch<BloqueoItem[]>(ENDPOINTS.CHAT_BLOQUEOS);
+  const misBloqueos = toArray<BloqueoItem>(bloqueosData);
+  const bloqueado = !!memberId && misBloqueos.some(
+    (b) => b.id_usuario_bloqueado === Number(memberId),
+  );
 
   const handleSend = async () => {
     const texto = msg.trim();
@@ -211,6 +221,12 @@ export default function TrainerChatScreen() {
             ? <Text style={styles.chatHeaderEmail}>{selectedMember.email}</Text>
             : null}
         </View>
+        <ChatModeracion
+          contraparteId={memberId ?? null}
+          contraparteNombre={selectedMember.nombre}
+          bloqueado={bloqueado}
+          onCambio={() => { refetchBloqueos(); refetchC(); }}
+        />
         <TouchableOpacity
           onPress={() => { refetchC(); refetchUnread(); }}
           style={styles.refreshBtn}
@@ -220,6 +236,13 @@ export default function TrainerChatScreen() {
         </TouchableOpacity>
       </View>
 
+      {chatError ? (
+        <View style={styles.bloqueadoBanner}>
+          <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />
+          <Text style={styles.bloqueadoBannerText}>{chatError}</Text>
+        </View>
+      ) : (
+      <>
       {/* Mensajes */}
       <FlatList
         ref={flatRef}
@@ -286,6 +309,8 @@ export default function TrainerChatScreen() {
           <Ionicons name={sending ? 'hourglass-outline' : 'send'} size={18} color={colors.onAccent} />
         </TouchableOpacity>
       </View>
+      </>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -340,6 +365,10 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   refreshBtn:        { padding: 6 },
   chatList:    { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexGrow: 1, justifyContent: 'flex-end' },
   chatEmpty:   { alignItems: 'center', gap: 8, paddingVertical: 40 },
+  bloqueadoBanner: { flexDirection: 'row', alignItems: 'center', gap: 10,
+                  marginHorizontal: 16, marginTop: 16, padding: 14, borderRadius: 12,
+                  backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  bloqueadoBannerText: { flex: 1, color: colors.textMuted, fontSize: 13 * fs, lineHeight: 18 },
   chatEmptyText: { color: colors.textMuted, fontSize: 13 * fs, textAlign: 'center', paddingHorizontal: 20 },
   bubble:      { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, gap: 4 },
   bubbleMe:    { alignSelf: 'flex-end', backgroundColor: colors.accent, borderBottomRightRadius: 4 },

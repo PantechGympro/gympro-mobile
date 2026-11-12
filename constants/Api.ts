@@ -205,4 +205,11 @@ export const ENDPOINTS = {
   USER_TRAINER:         '/user/training/trainers',
   USER_CHAT:            '/user/training/chat',
   USER_SEND_MSG:        '/user/training/chat',
+
+  // Chat — Moderación (compartido Miembro/Entrenador, HU-12).
+  // app/routes/compartido/chat_moderacion.py: mismo contrato para ambos
+  // lados del chat 1:1, así que un solo par de endpoints cubre las dos
+  // pantallas (app/(member)/chat.tsx y app/(trainer)/chat.tsx).
+  CHAT_BLOQUEOS:        '/chat/bloqueos',    // GET mis bloqueos | POST bloquear | DELETE /chat/bloqueos/<id_usuario>
+  CHAT_REPORTES:        '/chat/reportes',    // POST { id_usuario_reportado, motivo, comentario?, id_mensaje? }
 } as const;
