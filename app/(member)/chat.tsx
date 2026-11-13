@@ -32,6 +32,7 @@ import Badge from '../../components/ui/Badge';
 import PerfilEntrenador from '../../components/usuarios/PerfilEntrenador';
 import api from '../../services/api';
 import * as Haptics from 'expo-haptics';
+import ChatModeracion, { BloqueoItem } from '../../components/shared/ChatModeracion';
 
 interface Trainer {
   id?:           number;
@@ -120,10 +121,19 @@ export default function MemberChatScreen() {
   const trainerId  = active?.id ?? active?._id;
   const chatUrl    = trainerId ? `${ENDPOINTS.USER_CHAT_BASE}/${trainerId}` : '';
 
-  const { data: chatData, loading: loadingC, refetch: refetchC } =
+  const { data: chatData, loading: loadingC, error: chatError, refetch: refetchC } =
     useFetch<ChatMsg[] | { mensajes: ChatMsg[] }>(chatUrl);
   const mensajes = toArray(
     Array.isArray(chatData) ? chatData : (chatData as any)?.mensajes ?? []
+  );
+
+  // HU-12: bloqueos que YO hice -- para marcar al entrenador activo como
+  // bloqueado sin depender de adivinar el motivo del 403 de mas arriba.
+  const { data: bloqueosData, refetch: refetchBloqueos } =
+    useFetch<BloqueoItem[]>(ENDPOINTS.CHAT_BLOQUEOS);
+  const misBloqueos = toArray<BloqueoItem>(bloqueosData);
+  const bloqueado = !!trainerId && misBloqueos.some(
+    (b) => b.id_usuario_bloqueado === Number(trainerId),
   );
 
   const [requestingId, setRequestingId] = useState<number | null>(null);
@@ -322,6 +332,17 @@ export default function MemberChatScreen() {
                 : null}
             </View>
             <Badge label="PT" color="accent" />
+            {/* HU-12: boton de moderacion fuera del TouchableOpacity que abre
+                el perfil -- stopPropagation evita que tocarlo tambien navegue
+                al perfil del entrenador. */}
+            <View onStartShouldSetResponder={() => true}>
+              <ChatModeracion
+                contraparteId={trainerId ? Number(trainerId) : null}
+                contraparteNombre={trainerName(active)}
+                bloqueado={bloqueado}
+                onCambio={() => { refetchBloqueos(); refetchC(); }}
+              />
+            </View>
             <TouchableOpacity onPress={(e) => { e.stopPropagation(); refetchC(); refetchT(); }}
               style={styles.refreshBtn} accessibilityLabel="Actualizar">
               <Ionicons name="refresh-outline" size={20} color={colors.textSecondary} />
@@ -330,6 +351,13 @@ export default function MemberChatScreen() {
         </TouchableOpacity>
       )}
 
+      {chatError ? (
+        <View style={styles.bloqueadoBanner}>
+          <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />
+          <Text style={styles.bloqueadoBannerText}>{chatError}</Text>
+        </View>
+      ) : (
+      <>
       {/* Mensajes */}
       <FlatList
         ref={flatRef}
@@ -401,6 +429,8 @@ export default function MemberChatScreen() {
           <Ionicons name={sending ? 'hourglass-outline' : 'send'} size={18} color={colors.onAccent} />
         </TouchableOpacity>
       </View>
+      </>
+      )}
 
       <PerfilEntrenador
         trainerId={perfilId}
@@ -445,6 +475,10 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   chatList:     { paddingHorizontal: 16, paddingVertical: 12, gap: 8,
                   flexGrow: 1, justifyContent: 'flex-end' },
   chatEmpty:    { alignItems: 'center', gap: 8, paddingVertical: 40 },
+  bloqueadoBanner: { flexDirection: 'row', alignItems: 'center', gap: 10,
+                  marginHorizontal: 16, marginTop: 16, padding: 14, borderRadius: 12,
+                  backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  bloqueadoBannerText: { flex: 1, color: colors.textMuted, fontSize: 13 * fs, lineHeight: 18 },
   chatEmptyText:{ color: colors.textMuted, fontSize: 13 * fs, textAlign: 'center', paddingHorizontal: 20 },
   bubble:       { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, gap: 4 },
   bubbleMe:     { alignSelf: 'flex-end', backgroundColor: colors.accent, borderBottomRightRadius: 4 },

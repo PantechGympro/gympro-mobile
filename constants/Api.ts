@@ -192,6 +192,7 @@ export const ENDPOINTS = {
   USER_PRODUCTOS:       '/owner_gym/productos',    // GET /api/owner_gym/productos (catálogo visible al miembro)
   USER_VENTAS:          '/ventas',                 // GET /api/ventas (historial filtrado por gimnasio)
   USER_COMPRAR:         '/ventas',                 // POST /api/ventas (registrar compra)
+  GYM_HORARIOS:         '/owner_gym/horarios',     // GET /api/owner_gym/horarios (HU-39: horario de atención, sin restricción de rol)
 
   // Member — Entrenamiento (training_bp en /api/user/training)
   USER_TRAINERS_LIST:   '/user/training/trainers', // GET /api/user/training/trainers
@@ -205,4 +206,11 @@ export const ENDPOINTS = {
   USER_TRAINER:         '/user/training/trainers',
   USER_CHAT:            '/user/training/chat',
   USER_SEND_MSG:        '/user/training/chat',
+
+  // Chat — Moderación (compartido Miembro/Entrenador, HU-12).
+  // app/routes/compartido/chat_moderacion.py: mismo contrato para ambos
+  // lados del chat 1:1, así que un solo par de endpoints cubre las dos
+  // pantallas (app/(member)/chat.tsx y app/(trainer)/chat.tsx).
+  CHAT_BLOQUEOS:        '/chat/bloqueos',    // GET mis bloqueos | POST bloquear | DELETE /chat/bloqueos/<id_usuario>
+  CHAT_REPORTES:        '/chat/reportes',    // POST { id_usuario_reportado, motivo, comentario?, id_mensaje? }
 } as const;
