@@ -16,7 +16,7 @@
  *   total: float
  *   metodo_pago: "Efectivo"
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
   Alert, Modal, ScrollView, Image,
@@ -57,6 +57,10 @@ interface Compra {
   total?:  number;
   metodo_pago?: string;
   items?:  { nombre: string; cantidad?: number; qty?: number; precio_unitario?: number; precio?: number }[];
+  // HU-39: entrega del producto
+  estado_entrega?: 'pendiente' | 'entregado' | null;
+  fecha_recogida?:  string | null;
+  hora_recogida?:   string | null;
 }
 
 interface Cart { [id: string]: { producto: Producto; cantidad: number } }
@@ -101,6 +105,69 @@ export default function MemberPOSScreen() {
 
   // Checkout
   const [showCheckout, setShowCheckout] = useState(false);
+
+  // ── HU-39: día y hora de recogida del producto ──────────────────────────
+  const { data: horariosData } = useFetch<{
+    horarios?: Record<string, { cerrado: boolean; apertura: string; cierre: string }>;
+  }>(ENDPOINTS.GYM_HORARIOS);
+  const [pickupDate, setPickupDate] = useState<string | null>(null);
+  const [pickupTime, setPickupTime] = useState<string | null>(null);
+
+  // Próximos 7 días en que el gimnasio abre, cada uno con sus franjas de 30
+  // min dentro del horario de atención. La validación real (autoritativa)
+  // ocurre en el backend; esto solo evita ofrecer algo que el servidor
+  // rechazaría.
+  const pickupDays = useMemo(() => {
+    const horarios = horariosData?.horarios;
+    if (!horarios) return [] as { iso: string; label: string; slots: string[] }[];
+
+    const DIA_KEY_POR_JS_DAY = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const ahora = new Date();
+    const dias: { iso: string; label: string; slots: string[] }[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(ahora);
+      d.setDate(d.getDate() + i);
+      const horario = horarios[DIA_KEY_POR_JS_DAY[d.getDay()]];
+      if (!horario || horario.cerrado) continue;
+
+      const [hA, mA] = horario.apertura.split(':').map(Number);
+      const [hC, mC] = horario.cierre.split(':').map(Number);
+      const finMin = hC * 60 + mC;
+      // Para hoy, solo franjas a partir de ahora + 15 min de colchón.
+      const minDesde = i === 0 ? Math.max(hA * 60 + mA, ahora.getHours() * 60 + ahora.getMinutes() + 15) : hA * 60 + mA;
+
+      const slots: string[] = [];
+      for (let cursor = minDesde; cursor <= finMin; cursor += 30) {
+        const hh = String(Math.floor(cursor / 60)).padStart(2, '0');
+        const mm = String(cursor % 60).padStart(2, '0');
+        slots.push(`${hh}:${mm}`);
+      }
+      if (slots.length === 0) continue;
+
+      const label = i === 0 ? 'Hoy' : i === 1 ? 'Mañana'
+        : d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      dias.push({ iso, label, slots });
+    }
+    return dias;
+  }, [horariosData]);
+
+  // Preselecciona el primer día/horario disponible al abrir el checkout.
+  useEffect(() => {
+    if (!showCheckout || pickupDays.length === 0) return;
+    if (!pickupDate || !pickupDays.some(d => d.iso === pickupDate)) {
+      setPickupDate(pickupDays[0].iso);
+      setPickupTime(pickupDays[0].slots[0]);
+    }
+  }, [showCheckout, pickupDays]);
+
+  const selectedDaySlots = pickupDays.find(d => d.iso === pickupDate)?.slots ?? [];
+  const pickupLabel = (iso: string | null) => {
+    if (!iso) return '';
+    const dia = pickupDays.find(d => d.iso === iso);
+    return dia ? dia.label : iso;
+  };
 
   const { data: prodData, loading: loadingP, refetch: refetchP } =
     useFetch<{ productos?: Producto[] }>(ENDPOINTS.USER_PRODUCTOS);
@@ -147,6 +214,10 @@ export default function MemberPOSScreen() {
       Alert.alert('Sin conexión', 'No puedes registrar una compra sin conexión a internet. Intenta de nuevo cuando la recuperes.');
       return;
     }
+    if (!pickupDate || !pickupTime) {
+      Alert.alert('Falta la hora de recogida', 'Elige el día y la hora en que pasarás por tu producto.');
+      return;
+    }
     setBuying(true);
     try {
       const payload: Record<string, any> = {
@@ -157,20 +228,30 @@ export default function MemberPOSScreen() {
           qty:       cantidad,
           categoria: producto.categoria ?? 'General',
         })),
-        total:       cartTotal,
-        metodo_pago: 'Efectivo',
+        total:          cartTotal,
+        metodo_pago:    'Efectivo',
+        // HU-39: hora acordada de recogida -- el servidor la valida contra
+        // el horario de atención y avisa al personal del gimnasio.
+        fecha_recogida: pickupDate,
+        hora_recogida:  pickupTime,
       };
       if (user?.id)     payload.id_miembro     = Number(user.id);
       if (user?.nombre) payload.nombre_miembro = user.nombre;
 
       await api.post(ENDPOINTS.USER_COMPRAR, payload);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const diaLabel = pickupLabel(pickupDate);
       setCart({});
       setShowCheckout(false);
+      setPickupDate(null);
+      setPickupTime(null);
       setTab('historial');
       refetchH();
       refetchP();
-      Alert.alert('Compra registrada', 'Pasa a recepción para completar el pago.');
+      Alert.alert(
+        'Compra registrada',
+        `Pasa a recepción para completar el pago. Avisamos al personal: tu producto te espera ${diaLabel.toLowerCase()} a las ${pickupTime}.`,
+      );
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.error ?? 'No se pudo procesar la compra');
     } finally {
@@ -318,6 +399,20 @@ export default function MemberPOSScreen() {
                     · {it.nombre} ×{it.cantidad ?? it.qty ?? 1}
                   </Text>
                 ))}
+                {/* HU-39: estado de entrega del producto */}
+                {c.estado_entrega === 'pendiente' && (
+                  <View style={{ marginTop: 6 }}>
+                    <Badge
+                      label={`Pasas por él el ${c.fecha_recogida} a las ${c.hora_recogida}`}
+                      color="warning"
+                    />
+                  </View>
+                )}
+                {c.estado_entrega === 'entregado' && (
+                  <View style={{ marginTop: 6 }}>
+                    <Badge label="Entregado" color="success" />
+                  </View>
+                )}
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 <Text style={styles.compraTotal}>${(c.total ?? 0).toFixed(2)}</Text>
@@ -433,12 +528,49 @@ export default function MemberPOSScreen() {
                 </View>
               )}
 
+              {/* ── HU-39: día y hora de recogida ───────────────────────── */}
+              <Text style={styles.payLabel}>¿Cuándo pasas por tu producto?</Text>
+              {pickupDays.length === 0 ? (
+                <Text style={styles.pickupHint}>Cargando horario del gimnasio…</Text>
+              ) : (
+                <>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                    {pickupDays.map((d) => (
+                      <TouchableOpacity
+                        key={d.iso}
+                        style={[styles.pickupDayChip, pickupDate === d.iso && styles.pickupChipActive]}
+                        onPress={() => { setPickupDate(d.iso); setPickupTime(d.slots[0]); }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Elegir ${d.label} para recoger el producto`}>
+                        <Text style={[styles.pickupChipText, pickupDate === d.iso && styles.pickupChipTextActive]}>
+                          {d.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <View style={styles.pickupTimeGrid}>
+                    {selectedDaySlots.map((t) => (
+                      <TouchableOpacity
+                        key={t}
+                        style={[styles.pickupTimeChip, pickupTime === t && styles.pickupChipActive]}
+                        onPress={() => setPickupTime(t)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Elegir las ${t} para recoger el producto`}>
+                        <Text style={[styles.pickupChipText, pickupTime === t && styles.pickupChipTextActive]}>
+                          {t}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
               {/* ── Pago en efectivo ────────────────────────────────────── */}
-              <Text style={styles.payLabel}>Pagar en recepción</Text>
+              <Text style={[styles.payLabel, { marginTop: 18 }]}>Pagar en recepción</Text>
               <TouchableOpacity
-                style={[styles.confirmBtn, (buying || !conectado) && { opacity: 0.6 }]}
+                style={[styles.confirmBtn, (buying || !conectado || !pickupDate || !pickupTime) && { opacity: 0.6 }]}
                 onPress={handleCheckout}
-                disabled={buying || !conectado}
+                disabled={buying || !conectado || !pickupDate || !pickupTime}
                 accessibilityLabel="Registrar compra para pagar en efectivo"
                 accessibilityRole="button">
                 <Ionicons name={buying ? 'hourglass-outline' : 'cash-outline'} size={20} color={colors.onAccent} />
@@ -457,7 +589,7 @@ export default function MemberPOSScreen() {
                 descripcion={`Compra de ${cartCount} artículo${cartCount === 1 ? '' : 's'}`}
                 referenciaLocal={user?.id ?? null}
                 emailPagador={user?.email ?? null}
-                deshabilitado={buying || cartItems.length === 0 || !conectado}
+                deshabilitado={buying || cartItems.length === 0 || !conectado || !pickupDate || !pickupTime}
                 metadatos={{
                   items: cartItems.map(({ producto, cantidad }) => ({
                     id:        producto.id ?? producto._id,
@@ -468,6 +600,9 @@ export default function MemberPOSScreen() {
                   })),
                   id_miembro:     user?.id ?? null,
                   nombre_miembro: user?.nombre ?? '',
+                  // HU-39: hora acordada de recogida.
+                  fecha_recogida: pickupDate,
+                  hora_recogida:  pickupTime,
                 }}
                 onPagado={(tx) => {
                   // El backend registra la venta al confirmar el cobro; aquí solo
@@ -475,6 +610,8 @@ export default function MemberPOSScreen() {
                   if (tx?.estado === 'rechazado' || tx?.estado === 'cancelado') return;
                   setCart({});
                   setShowCheckout(false);
+                  setPickupDate(null);
+                  setPickupTime(null);
                   setTab('historial');
                   refetchH();
                   refetchP();
@@ -569,5 +706,15 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   confirmBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
                    backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, marginTop: 8 },
   confirmBtnText:{ color: colors.onAccent, fontSize: 16 * fs, fontWeight: '700' },
+  // HU-39: selector de día/hora de recogida
+  pickupHint:        { color: colors.textMuted, fontSize: 13 * fs, marginBottom: 10 },
+  pickupDayChip:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8,
+                        backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  pickupTimeGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  pickupTimeChip:     { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+                        backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  pickupChipActive:   { backgroundColor: colors.accent, borderColor: colors.accent },
+  pickupChipText:     { color: colors.textSecondary, fontSize: 13 * fs, fontWeight: '600' },
+  pickupChipTextActive: { color: colors.onAccent },
 });
 }
