@@ -39,6 +39,19 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "GymPro necesita acceso a tus fotos para que puedas cambiar tu foto de perfil."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#6c63ff"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

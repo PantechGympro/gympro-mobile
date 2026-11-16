@@ -1,16 +1,18 @@
 /**
  * Pantalla Perfil del Miembro — datos personales y cierre de sesión.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, TextInput, RefreshControl, Image, Modal,
+  Alert, TextInput, RefreshControl, Image, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // LinearGradient eliminado — puede fallar en Fabric (new arch) antes de registrarse
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useColors, useFontScale } from '../../../hooks/useColors';
+import { useAuthedImage } from '../../../hooks/useAuthedImage';
 import { ENDPOINTS, API_BASE_URL } from '../../../constants/Api';
 import { useFetch } from '../../../hooks/useFetch';
 import { useAuth } from '../../../hooks/useAuth';
@@ -73,13 +75,14 @@ export default function ProfileScreen() {
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { data, loading, refetch } = useFetch<ProfileData>(ENDPOINTS.USER_PROFILE);
 
   const [editing, setEditing]     = useState(false);
   const [showA11y, setShowA11y]   = useState(false);
   const [saving,  setSaving]      = useState(false);
   const [photoError, setPhotoError] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Campos editables del perfil
   const [nombre,   setNombre]   = useState('');
@@ -96,12 +99,28 @@ export default function ProfileScreen() {
 
   // Resuelve la foto: data URI tal cual, URL absoluta tal cual, o nombre de
   // archivo → lo sirve el backend en /api/uploads/<archivo>.
-  const photoUri = (() => {
+  const photoUriCruda = (() => {
     const f = data?.fotoPerfil;
     if (!f) return null;
     if (f.startsWith('data:image') || f.startsWith('http')) return f;
     return `${API_BASE_URL}/uploads/${f}`;
   })();
+  // /api/uploads/<archivo> exige sesion (JWT) -- <Image> no puede mandarla
+  // por su cuenta, asi que se trae el archivo ya autenticado y se muestra
+  // como data URI. Ver hooks/useAuthedImage.ts para el porque completo.
+  const photoUri = useAuthedImage(photoUriCruda);
+
+  // Sincroniza el avatar global (store de auth, usado por el cajon de
+  // navegacion) con lo que de verdad hay en el backend. Sin esto, si la foto
+  // se cambio desde la WEB, el cajon se quedaba con la version vieja hasta
+  // cerrar sesion y volver a entrar -- este fetch (GET /api/user/profile) ya
+  // trae el dato fresco, asi que se aprovecha para refrescar tambien el
+  // store, igual que ya hace subirFotoPerfil() tras un cambio hecho aqui.
+  useEffect(() => {
+    if (!photoUriCruda) return;
+    if (user?.foto_perfil === photoUriCruda) return;
+    updateUser({ foto_perfil: photoUriCruda });
+  }, [photoUriCruda]);
 
   const startEdit = () => {
     setNombre(data?.nombre ?? user?.nombre ?? '');
@@ -144,6 +163,90 @@ export default function ProfileScreen() {
     }
   };
 
+  /**
+   * Cambiar foto de perfil (pedido del gym, nov/2026): expo-image-picker ya
+   * era dependencia del proyecto pero nunca se habia conectado -- no existia
+   * forma de hacer esto desde la app. Mismo contrato que ya usa la web
+   * (UserProfile.jsx -> handlePhotoUpload): POST multipart a
+   * /api/user/profile/photo con el campo "foto"; el backend guarda el
+   * archivo y devuelve solo el NOMBRE (no una URL ni un data URI), por eso
+   * se normaliza igual que `photoUri` arriba antes de guardarlo.
+   */
+  const subirFotoPerfil = async (uri: string, mime: string, nombreArchivo: string) => {
+    setUploadingPhoto(true);
+    try {
+      const form = new FormData();
+      // React Native: el valor de un archivo en FormData es este objeto
+      // {uri, name, type}, no un Blob como en el navegador.
+      form.append('foto', { uri, name: nombreArchivo, type: mime } as any);
+
+      const { data: resp } = await api.post<{ fotoPerfil: string }>(
+        ENDPOINTS.USER_PROFILE_PHOTO,
+        form,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+
+      const archivo = resp.fotoPerfil;
+      const urlNormalizada = archivo.startsWith('data:image') || archivo.startsWith('http')
+        ? archivo
+        : `${API_BASE_URL}/uploads/${archivo}`;
+
+      setPhotoError(false);
+      // Se actualiza el usuario global (no solo este `refetch`) para que el
+      // avatar del cajón de navegación cambie también, sin esperar a un
+      // refresco de sesión o reabrir la app.
+      await updateUser({ foto_perfil: urlNormalizada });
+      await refetch();
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.error ?? 'No se pudo actualizar la foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const cambiarFotoPerfil = async () => {
+    // nov/2026: todo este bloque va envuelto en try/catch -- sin esto, una
+    // excepcion nativa del picker (por ejemplo si el permiso de fotos aun no
+    // quedo registrado porque falta un build nuevo del dev client tras
+    // agregar el plugin de expo-image-picker a app.json) se escapaba como
+    // promesa no atrapada. React Native no la mostraba con su mensaje real:
+    // LogBox intentaba symbolicar el stack nativo contra Metro y, al no
+    // poder, mostraba el aviso generico "Cannot connect to Expo CLI" en vez
+    // del error de verdad.
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          'Permiso necesario',
+          'Activa el acceso a tus fotos en los ajustes del sistema para poder cambiar tu foto de perfil.',
+        );
+        return;
+      }
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        // ['images'] en vez del enum MediaTypeOptions.Images -- deprecado en
+        // esta version de expo-image-picker (56.x).
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (resultado.canceled || !resultado.assets?.[0]) return;
+
+      const asset = resultado.assets[0];
+      const mime  = asset.mimeType || 'image/jpeg';
+      const ext   = mime.split('/')[1] || 'jpg';
+      const nombreArchivo = asset.fileName || `foto_perfil.${ext}`;
+      await subirFotoPerfil(asset.uri, mime, nombreArchivo);
+    } catch (e: any) {
+      Alert.alert(
+        'No se pudo abrir el selector de fotos',
+        e?.message
+          ? `${e.message}\n\nSi acabas de actualizar la app, puede que haga falta generar un build nuevo (expo run:android / run:ios) para que el permiso de fotos quede registrado.`
+          : 'Intenta de nuevo. Si sigue fallando, puede que haga falta generar un build nuevo de la app (expo run:android / run:ios).',
+      );
+    }
+  };
+
   const handleLogout = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert('Cerrar sesión', '¿Estás seguro de que deseas salir?', [
@@ -166,7 +269,13 @@ export default function ProfileScreen() {
     >
       {/* Hero banner — sin LinearGradient */}
       <View style={[styles.hero, { paddingTop: insets.top + 20 }]}>
-        <View style={styles.avatarWrap} accessibilityLabel={`Avatar de ${displayNombre}`}>
+        <TouchableOpacity
+          style={styles.avatarWrap}
+          onPress={cambiarFotoPerfil}
+          disabled={uploadingPhoto}
+          accessibilityRole="button"
+          accessibilityLabel={`Cambiar foto de perfil de ${displayNombre}`}
+        >
           {photoUri && !photoError ? (
             <Image source={{ uri: photoUri }} style={styles.avatarImg} resizeMode="cover"
               onError={() => setPhotoError(true)} />
@@ -175,7 +284,12 @@ export default function ProfileScreen() {
               <Text style={styles.initials}>{initials}</Text>
             </View>
           )}
-        </View>
+          <View style={styles.avatarEditBadge}>
+            {uploadingPhoto
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="camera" size={14} color="#fff" />}
+          </View>
+        </TouchableOpacity>
         <Text style={styles.heroName}>{displayNombre}</Text>
         <Text style={styles.heroEmail}>{data?.email ?? user?.email ?? ''}</Text>
 
@@ -413,7 +527,20 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     gap:           10,
     backgroundColor: colors.heroTop,
   },
-  avatarWrap: { marginBottom: 4 },
+  avatarWrap: { marginBottom: 4, position: 'relative' },
+  avatarEditBadge: {
+    position:        'absolute',
+    bottom:          2,
+    right:           2,
+    width:           26,
+    height:          26,
+    borderRadius:    13,
+    backgroundColor: colors.accent,
+    borderWidth:     2,
+    borderColor:     colors.heroTop,
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
   avatar: {
     width:           90,
     height:          90,

@@ -61,6 +61,8 @@ interface Compra {
   estado_entrega?: 'pendiente' | 'entregado' | null;
   fecha_recogida?:  string | null;
   hora_recogida?:   string | null;
+  // nov/2026: pago en efectivo que sigue sin cobrarse en recepcion
+  estado_pago?:     'pendiente' | 'pagado' | null;
 }
 
 interface Cart { [id: string]: { producto: Producto; cantidad: number } }
@@ -250,7 +252,7 @@ export default function MemberPOSScreen() {
       refetchP();
       Alert.alert(
         'Compra registrada',
-        `Pasa a recepción para completar el pago. Avisamos al personal: tu producto te espera ${diaLabel.toLowerCase()} a las ${pickupTime}.`,
+        `Tu pago queda pendiente hasta que pases a recepción. Avisamos al personal: tu producto te espera ${diaLabel.toLowerCase()} a las ${pickupTime}, y ahí pagas en efectivo.`,
       );
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.error ?? 'No se pudo procesar la compra');
@@ -401,11 +403,16 @@ export default function MemberPOSScreen() {
                 ))}
                 {/* HU-39: estado de entrega del producto */}
                 {c.estado_entrega === 'pendiente' && (
-                  <View style={{ marginTop: 6 }}>
+                  <View style={{ marginTop: 6, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     <Badge
                       label={`Pasas por él el ${c.fecha_recogida} a las ${c.hora_recogida}`}
                       color="warning"
                     />
+                    {/* nov/2026: el pago en efectivo se cobra hasta que recepcion
+                        lo recibe -- hasta entonces, queda pendiente. */}
+                    {c.estado_pago === 'pendiente' && (
+                      <Badge label="Pago pendiente (efectivo)" color="warning" />
+                    )}
                   </View>
                 )}
                 {c.estado_entrega === 'entregado' && (

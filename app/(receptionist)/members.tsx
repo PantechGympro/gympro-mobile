@@ -16,6 +16,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import DetalleUsuario, { fechaFicha, UsuarioDetalle } from '../../components/usuarios/DetalleUsuario';
+import AvatarFoto from '../../components/ui/AvatarFoto';
 import type { ReceptionistMember } from '../../types';
 
 const STATUS: Record<string, { label: string; color: 'success' | 'warning' | 'error' | 'info' }> = {
@@ -93,9 +94,7 @@ export default function ReceptionistMembersScreen() {
               >
                 <Card style={{ marginBottom: 10 }}>
                   <View style={styles.row}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.initial}>{m.nombre.charAt(0).toUpperCase()}</Text>
-                    </View>
+                    <AvatarFoto foto={(m as any).foto_perfil} nombre={m.nombre} size={44} borderRadius={14} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name}>{m.nombre}</Text>
                       <Text style={styles.sub} numberOfLines={1}>{m.email}</Text>

@@ -18,12 +18,13 @@
  */
 import React, { useMemo } from 'react';
 import {
-  View, Text, Modal, StyleSheet, ScrollView, TouchableOpacity, Image, Linking,
+  View, Text, Modal, StyleSheet, ScrollView, TouchableOpacity, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useFontScale } from '../../hooks/useColors';
 import { toStr, toDateStr } from '../../utils/format';
+import AvatarFoto from '../ui/AvatarFoto';
 
 /** Un dato de la ficha. Las filas sin valor no se dibujan. */
 export interface DatoUsuario {
@@ -98,15 +99,7 @@ export default function DetalleUsuario({ usuario, onClose, titulo = 'Detalle' }:
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Identidad */}
             <View style={styles.identidad}>
-              {usuario?.foto && usuario.foto.startsWith('data:image') ? (
-                <Image source={{ uri: usuario.foto }} style={styles.fotoGrande} resizeMode="cover" />
-              ) : (
-                <View style={styles.avatarGrande}>
-                  <Text style={styles.iniciales}>
-                    {toStr(usuario?.nombre, '?').trim().charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <AvatarFoto foto={usuario?.foto} nombre={usuario?.nombre} size={84} borderRadius={26} />
 
               <Text style={styles.nombre} numberOfLines={2}>{toStr(usuario?.nombre)}</Text>
               {usuario?.subtitulo ? (
