@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { router } from 'expo-router';
 import {
   loginRequest, persistSession, loadSession, clearSession, refrescarSesion,
-  cambiarPasswordInicialRequest,
+  cambiarPasswordInicialRequest, actualizarUsuario,
 } from '../services/auth';
 import { configureApi } from '../services/api';
 import type { AuthUser } from '../types';
@@ -20,6 +20,11 @@ interface AuthStore {
   clearError: () => void;
   // SCRUM-224: cambio de contraseña obligatorio en el primer ingreso.
   cambiarPasswordInicial: (nuevaPassword: string) => Promise<boolean>;
+  // Mezcla cambios de perfil (foto, nombre, email, ...) en el usuario en
+  // memoria y los persiste -- para que Mi Perfil, el cajon (avatar) y
+  // cualquier otro lugar que lea `user` se actualicen al toque, sin
+  // esperar a un refresco de sesion o un reinicio de la app.
+  updateUser: (cambios: Partial<AuthUser>) => Promise<void>;
 }
 
 function resolveHomeRoute(role: string): string {
@@ -143,5 +148,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ loading: false, error: msg });
       return false;
     }
+  },
+
+  updateUser: async (cambios) => {
+    const actual = get().user;
+    if (!actual) return;
+    const nuevo = { ...actual, ...cambios };
+    set({ user: nuevo });
+    await actualizarUsuario(nuevo);
   },
 }));

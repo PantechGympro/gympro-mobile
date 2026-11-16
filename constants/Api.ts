@@ -90,6 +90,7 @@ export const ENDPOINTS = {
   USER_CHECKIN_QR:    '/user/checkin/qr',        // POST /api/user/checkin/qr (escanear QR general del recepcionista)
   USER_CHECKINS_SEMANA: '/user/checkins/semana', // GET  /api/user/checkins/semana (dias con asistencia esta semana)
   USER_PROFILE:       '/user/profile',           // GET  /api/user/profile
+  USER_PROFILE_PHOTO: '/user/profile/photo',     // POST /api/user/profile/photo (multipart, campo "foto")
   USER_MEMBERSHIP:    '/user/membership',        // GET  /api/user/membership
   MEMBERSHIP_PLANS:   '/user/membership/plans',  // GET  /api/user/membership/plans
   MEMBERSHIP_RENEW:   '/user/membership/renew',  // POST /api/user/membership/renew

@@ -13,10 +13,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useFontScale } from '../../hooks/useColors';
 import { ENDPOINTS } from '../../constants/Api';
 import { useFetch } from '../../hooks/useFetch';
-import { toInitial, toStr, toArray } from '../../utils/format';
+import { toStr, toArray } from '../../utils/format';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Badge from '../../components/ui/Badge';
 import DetalleUsuario, { fechaFicha, UsuarioDetalle } from '../../components/usuarios/DetalleUsuario';
+import AvatarFoto from '../../components/ui/AvatarFoto';
 import type { TrainerClientsResponse, TrainerClientAPI } from '../../types';
 
 const ESTADO_TEXTO: Record<string, string> = {
@@ -115,9 +116,7 @@ export default function TrainerMembersScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Ver detalle de ${toStr(c.name)}`}
           >
-            <View style={styles.clientAvatar}>
-              <Text style={styles.clientInitial}>{toInitial(c.name)}</Text>
-            </View>
+            <AvatarFoto foto={(c as any).foto_perfil ?? (c as any).profilePhoto} nombre={c.name} size={44} borderRadius={14} />
             <View style={{ flex: 1 }}>
               <Text style={styles.clientName}>{toStr(c.name)}</Text>
               {c.goal ? <Text style={styles.clientGoal}>{toStr(c.goal)}</Text> : null}

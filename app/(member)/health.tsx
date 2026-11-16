@@ -221,24 +221,33 @@ export default function HealthScreen() {
   const lesiones     = toArray<string>(data?.lesiones);
   const hayMedicos = medicas.length + alergias.length + medicamentos.length + lesiones.length > 0;
 
-  const chipGroup = (title: string, items: string[], color: BadgeColor, emptyLabel: string) => (
-    <View style={styles.chipBlock}>
-      <Text style={styles.chipBlockTitle}>{title}</Text>
-      {items.length === 0 ? (
-        <View style={styles.chipVacio}>
-          <Text style={styles.chipVacioTexto}>{emptyLabel}</Text>
-        </View>
-      ) : (
-        <View style={styles.chipsRow}>
-          {items.map((it, i) => (
-            <View key={i} style={[styles.chip, { backgroundColor: colors[`${color}Bg` as keyof typeof colors] as string }]}>
-              <Text style={[styles.chipText, { color: colors[color] }]}>{it}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
+  const chipGroup = (groupKey: string, title: string, items: string[], color: BadgeColor, emptyLabel: string) => {
+    // Defensivo: el backend normalmente manda string[], pero estos 4 campos
+    // tienen dos vias de escritura con formatos historicos distintos (ver
+    // user_health.py / _a_lista) -- si alguna vez llega algo que no sea un
+    // string puro (null, un numero, un objeto suelto), lo convertimos aqui
+    // en vez de dejar que React truene con "Objects are not valid as a
+    // React child" al intentar pintarlo directo.
+    const lista = (items || []).map((it) => (typeof it === "string" ? it : String(it ?? "")));
+    return (
+      <View key={groupKey} style={styles.chipBlock}>
+        <Text style={styles.chipBlockTitle}>{title}</Text>
+        {lista.length === 0 ? (
+          <View style={styles.chipVacio}>
+            <Text style={styles.chipVacioTexto}>{emptyLabel}</Text>
+          </View>
+        ) : (
+          <View style={styles.chipsRow}>
+            {lista.map((it, i) => (
+              <View key={i} style={[styles.chip, { backgroundColor: colors[`${color}Bg` as keyof typeof colors] as string }]}>
+                <Text style={[styles.chipText, { color: colors[color] }]}>{it}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <ScrollView
@@ -328,7 +337,7 @@ export default function HealthScreen() {
         {MEDICAL_GROUPS.map(({ key, title, color, emptyLabel }) => {
           const items = key === 'condiciones' ? medicas : key === 'alergias' ? alergias
                       : key === 'medicamentos' ? medicamentos : lesiones;
-          return chipGroup(title, items, color, emptyLabel);
+          return chipGroup(key, title, items, color, emptyLabel);
         })}
         {!hayMedicos && (
           <Text style={styles.chipEmpty}>Sin información médica registrada. Toca “Editar” para añadirla.</Text>

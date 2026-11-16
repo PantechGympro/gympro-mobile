@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, Image,
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useFontScale } from '../../hooks/useColors';
 import { ENDPOINTS } from '../../constants/Api';
 import { useFetch } from '../../hooks/useFetch';
-import { toDateStr, toInitial, toStr, matchesSearch, toArray } from '../../utils/format';
+import { toDateStr, toStr, matchesSearch, toArray } from '../../utils/format';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Badge from '../../components/ui/Badge';
 import DetalleUsuario, { fechaFicha, UsuarioDetalle } from '../../components/usuarios/DetalleUsuario';
+import AvatarFoto from '../../components/ui/AvatarFoto';
 import type { MiembrosResponse } from '../../types';
 
 /** Traduce un miembro de la API a la ficha genérica del detalle. */
@@ -98,13 +99,7 @@ export default function AdminMembersScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Ver detalle de ${toStr(m.nombre)}`}
           >
-            {m.foto_perfil && m.foto_perfil.startsWith('data:image') ? (
-              <Image source={{ uri: m.foto_perfil }} style={styles.avatarImg} resizeMode="cover" />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.initial}>{toInitial(m.nombre)}</Text>
-              </View>
-            )}
+            <AvatarFoto foto={m.foto_perfil} nombre={m.nombre} size={44} borderRadius={14} />
             <View style={{ flex: 1 }}>
               <Text style={styles.nombre}>{toStr(m.nombre)}</Text>
               <Text style={styles.email}>{toStr(m.email)}</Text>

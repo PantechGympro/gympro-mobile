@@ -1,27 +1,30 @@
 /**
  * CustomDrawer — Sidebar izquierda compartida para todos los roles.
- * Incluye botón de accesibilidad (⚙) que abre AccessibilityPanel.
  * Reacciona al tema activo vía useColors().
  *
  * Rediseño de navegación global (ver ../../app/(member)/_layout.tsx para el
  * resto del contexto): el cajón dejó de llevar Inicio/Entrenamiento/
- * Nutrición/Perfil (ahora en la Bottom Tab Bar) y los acordeones
- * desplegables de Membresía/Progreso se fusionaron en ítems directos. Lo
- * que queda aquí es: la lista dinámica de Drawer.Screen no ocultas (para
- * el rol Miembro: Membresía, Progreso y Salud, Punto de Venta — los demás
- * roles siguen viendo la suya propia, sin cambios) más un bloque fijo de
- * opciones de app (Ajustes, Notificaciones, Accesibilidad, Soporte) que no
- * son Drawer.Screen porque sus pantallas no viven dentro de este grupo de
- * rutas, o no son ni siquiera una pantalla (Accesibilidad es un modal
- * local).
+ * Nutrición/Perfil (ahora en la Bottom Tab Bar, solo dentro del grupo
+ * "(tabs)") y los acordeones desplegables de Membresía/Progreso se
+ * fusionaron en ítems directos. Lo que queda aquí es: accesos directos a
+ * Inicio/Perfil solo para Miembro (ver `esMiembro` más abajo -- la tab bar
+ * no existe fuera de "(tabs)", así que sin esto no había forma de volver);
+ * la lista dinámica de Drawer.Screen no ocultas (para el rol Miembro:
+ * Membresía, Progreso y Salud, Punto de Venta — los demás roles siguen
+ * viendo la suya propia, sin cambios); y un bloque fijo de opciones de app
+ * (Ajustes, Notificaciones, Soporte) que no son Drawer.Screen porque sus
+ * pantallas no viven dentro de este grupo de rutas. "Accesibilidad" se
+ * quitó de este bloque (nov/2026): ya vive dentro de Ajustes, ver
+ * app/ajustes.tsx.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useAuthedImage } from '../../hooks/useAuthedImage';
 /**
  * Contrato del contenido del cajón.
  *
@@ -48,7 +51,6 @@ interface PropsCajon {
 import { useColors, useFontScale } from '../../hooks/useColors';
 import { useAuth } from '../../hooks/useAuth';
 import { toStr } from '../../utils/format';
-import AccessibilityPanel from '../settings/AccessibilityPanel';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -61,10 +63,14 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
  * Accesibilidad no navega a ningún lado: abre el modal local más abajo.
  */
 interface OpcionApp { id: string; label: string; icon: IconName }
+// "Accesibilidad" se quito de aqui (nov/2026, pedido del gym): quedaba
+// duplicado -- ya es una fila dentro de Ajustes (ver app/ajustes.tsx) y
+// aparecer tambien suelto en el cajon confundia sobre cual era el lugar
+// "real". El modal AccessibilityPanel y el estado showA11y de abajo
+// tambien se quitan: ya no hay quien los abra desde aqui.
 const OPCIONES_APP: OpcionApp[] = [
   { id: 'ajustes',       label: 'Ajustes',       icon: 'settings-outline' },
   { id: 'notificaciones', label: 'Notificaciones', icon: 'notifications-outline' },
-  { id: 'accesibilidad', label: 'Accesibilidad', icon: 'accessibility-outline' },
   { id: 'soporte',       label: 'Soporte',       icon: 'help-buoy-outline' },
 ];
 
@@ -89,27 +95,51 @@ export default function CustomDrawer(props: PropsCajon) {
   const fs      = useFontScale();
   const { user, logout } = useAuth();
 
-  const [showA11y, setShowA11y] = useState(false);
+  // Inicio/Entrenamiento/Nutricion/Perfil viven en la Bottom Tab Bar (ver
+  // ../../app/(member)/(tabs)/_layout.tsx) y por diseno NO son Drawer.Screen
+  // de este cajon -- pero esa tab bar solo existe DENTRO del grupo "(tabs)".
+  // En cuanto el miembro entra a cualquier otra pantalla del Drawer
+  // (Membresia, Progreso y Salud, Punto de Venta, Ajustes, Notificaciones,
+  // Soporte) la tab bar desaparece y el cajon se quedaba sin forma de
+  // volver a Inicio o llegar a Perfil -- callejon sin salida real (pedido
+  // del gym, nov/2026: "falta el boton de Pagina Principal y el de Perfil
+  // en la barra de navegacion"). Se agregan aqui como accesos directos,
+  // solo para el rol Miembro (los demas roles ya tienen Dashboard/Mi Perfil
+  // como filas normales de su propio Drawer -- ver SCREENS en sus
+  // app/(admin|trainer|receptionist)/_layout.tsx).
+  const esMiembro = user?.role === 'Miembro' || user?.role === 'user';
 
   const nombre    = toStr(user?.nombre, 'Usuario');
   const initials  = nombre.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
   const roleLabel = getRoleLabel(user?.role);
 
+  // /api/uploads/<archivo> exige sesion -- se resuelve a data URI mostrable
+  // antes de pasarselo a <Image> (ver hooks/useAuthedImage.ts).
+  const fotoCruda = (user?.foto_perfil &&
+    (user.foto_perfil.startsWith('data:image') || user.foto_perfil.startsWith('http')))
+    ? user.foto_perfil
+    : null;
+  const fotoAutenticada = useAuthedImage(fotoCruda);
+
   const irAOpcionApp = (id: string) => {
-    if (id === 'accesibilidad') { setShowA11y(true); return; }
     if (id === 'ajustes')       { router.push('/ajustes');       return; }
     if (id === 'notificaciones') { router.push('/notifications'); return; }
     if (id === 'soporte')       { router.push('/soporte');       return; }
   };
 
   return (
-    <>
       <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
 
         {/* ── Cabecera ──────────────────────────────────────────────────── */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          {user?.foto_perfil && user.foto_perfil.startsWith('data:image') ? (
-            <Image source={{ uri: user.foto_perfil }}
+          {/* Misma regla de normalizacion que (tabs)/profile.tsx: puede venir
+              como data URI, URL absoluta (incluida la de /api/uploads/<archivo>
+              que arma el picker de Mi Perfil), o un nombre de archivo suelto.
+              fotoAutenticada resuelve /api/uploads/<archivo> (exige sesion)
+              a un data URI -- <Image> no puede mandar el JWT por su cuenta,
+              ver hooks/useAuthedImage.ts. */}
+          {fotoAutenticada ? (
+            <Image source={{ uri: fotoAutenticada }}
                    style={[styles.avatarImg, { backgroundColor: colors.surface, borderColor: colors.accent }]}
                    resizeMode="cover" />
           ) : (
@@ -129,6 +159,39 @@ export default function CustomDrawer(props: PropsCajon) {
           contentContainerStyle={styles.navList}
           showsVerticalScrollIndicator={false}
         >
+          {/* Accesos directos a la Bottom Tab Bar -- solo Miembro, ver el
+              comentario de `esMiembro` arriba. */}
+          {esMiembro && (
+            <>
+              <TouchableOpacity
+                onPress={() => router.push('/(member)/(tabs)')}
+                style={[styles.navItem, { borderRadius: 12 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Pagina Principal"
+              >
+                <View style={styles.navIcon}>
+                  <Ionicons name="home-outline" size={22} color={colors.textSecondary} />
+                </View>
+                <Text style={[styles.navLabel, { color: colors.textSecondary, fontSize: 14 * fs }]} numberOfLines={1}>
+                  Página Principal
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/(member)/(tabs)/profile')}
+                style={[styles.navItem, { borderRadius: 12 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Perfil"
+              >
+                <View style={styles.navIcon}>
+                  <Ionicons name="person-outline" size={22} color={colors.textSecondary} />
+                </View>
+                <Text style={[styles.navLabel, { color: colors.textSecondary, fontSize: 14 * fs }]} numberOfLines={1}>
+                  Perfil
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+
           {state.routes.map((route: any, i: number) => {
             const { options } = descriptors[route.key];
             const isFocused   = state.index === i;
@@ -216,10 +279,6 @@ export default function CustomDrawer(props: PropsCajon) {
           <Text style={[styles.version, { color: colors.textMuted }]}>GymPro v1.0.0</Text>
         </View>
       </View>
-
-      {/* Panel de accesibilidad */}
-      <AccessibilityPanel visible={showA11y} onClose={() => setShowA11y(false)} />
-    </>
   );
 }
 
