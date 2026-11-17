@@ -5,6 +5,7 @@
  * Al guardar: queda en su bitácora, cuenta como asistencia y calcula calorías.
  */
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   RefreshControl, Alert,
@@ -113,7 +114,7 @@ const setVolumen = (s: Serie, unidad?: string) => {
   return r.reduce((a, x) => a + x, 0) * (p.reduce((a, x) => a + x, 0) / p.length);
 };
 
-export default function WorkoutLogScreen() {
+function WorkoutLogScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -450,3 +451,6 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     wMetaTxt: { color: colors.textSecondary, fontSize: 12 * fs },
   });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(WorkoutLogScreen, 'el registro de entrenos');

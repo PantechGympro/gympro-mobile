@@ -54,6 +54,7 @@
  * nada (igual que antes).
  */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   Alert, Image, Linking, Modal,
@@ -179,7 +180,7 @@ function construirEjercicios(dia: RoutineDay | null): EjercicioUI[] {
     });
 }
 
-export default function StartWorkoutScreen() {
+function StartWorkoutScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -1166,3 +1167,6 @@ function make_styles(colors: any, fs: number) {
     serieUnidad: { fontSize: 11 * fs, color: colors.textMuted, width: 24 },
   });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(StartWorkoutScreen, 'tus entrenamientos');

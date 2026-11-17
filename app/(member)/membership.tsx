@@ -268,8 +268,12 @@ export default function MembershipScreen() {
 
           {membership.diasRestantes <= 7 && (
             <View style={styles.warnRow}>
-              <Ionicons name="alert-circle" size={16} color={colors.warning} />
-              <Text style={styles.warnText}>Tu membresía está por vencer. Renueva para no perder acceso.</Text>
+              <Ionicons name="alert-circle" size={16} color={membership.estado === 'vencida' ? colors.error : colors.warning} />
+              <Text style={styles.warnText}>
+                {membership.estado === 'vencida'
+                  ? 'Tu membresía venció. Renuévala aquí abajo para volver a entrenar; tu progreso sigue guardado.'
+                  : 'Tu membresía está por vencer. Renueva para no perder acceso.'}
+              </Text>
             </View>
           )}
         </Card>

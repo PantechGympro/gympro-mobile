@@ -28,6 +28,7 @@
  * esquina, para no delatar con naranja algo que no es una alerta.
  */
 import React, { useMemo, useState } from 'react';
+import { conMembresiaVigente } from '../../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
@@ -81,7 +82,7 @@ type RutinaUI = Rutina & { origen: Origen };
 interface WorkoutItemFecha { fecha: string }
 interface WorkoutsResponseFechas { workouts: WorkoutItemFecha[] }
 
-export default function TrainingScreen() {
+function TrainingScreen() {
   const colors = useColors();
   const fs     = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -409,3 +410,6 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     },
   });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(TrainingScreen, 'tus entrenamientos');

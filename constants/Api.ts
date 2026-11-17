@@ -92,6 +92,7 @@ export const ENDPOINTS = {
   USER_PROFILE:       '/user/profile',           // GET  /api/user/profile
   USER_PROFILE_PHOTO: '/user/profile/photo',     // POST /api/user/profile/photo (multipart, campo "foto")
   USER_MEMBERSHIP:    '/user/membership',        // GET  /api/user/membership
+  MEMBERSHIP_ESTADO:  '/user/membership/estado', // GET  /api/user/membership/estado (siempre disponible)
   MEMBERSHIP_PLANS:   '/user/membership/plans',  // GET  /api/user/membership/plans
   MEMBERSHIP_RENEW:   '/user/membership/renew',  // POST /api/user/membership/renew
   USER_PROGRESS:      '/user/progress',          // POST /api/user/progress
