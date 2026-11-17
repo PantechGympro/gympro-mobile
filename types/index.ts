@@ -252,6 +252,13 @@ export interface ActiveMembership {
   precio:        number;
 }
 
+/** Renovación que el miembro pidió (efectivo/transferencia) y recepción aún no confirma. */
+export interface RenovacionPendiente {
+  id: string; membresia_nombre?: string; monto?: number; metodo_pago?: string;
+  referencia?: string | null; creado_en?: string | null;
+}
+export interface EstadoMembresiaResponse { renovacion_pendiente?: RenovacionPendiente | null }
+
 export interface MembershipResponse {
   tieneMembresia: boolean;
   membresia?:     ActiveMembership;

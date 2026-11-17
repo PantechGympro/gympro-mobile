@@ -198,6 +198,8 @@ export const ENDPOINTS = {
   USER_PRODUCTOS:       '/owner_gym/productos',    // GET /api/owner_gym/productos (catálogo visible al miembro)
   USER_VENTAS:          '/ventas',                 // GET /api/ventas (historial filtrado por gimnasio)
   USER_COMPRAR:         '/ventas',                 // POST /api/ventas (registrar compra)
+  // Staff (recepción/administración/propietario): pagos del miembro por verificar
+  CONFIRMACIONES_PAGO:  '/confirmaciones-pago',    // GET lista; POST /{ventas|renovaciones}/<id>/{confirmar|rechazar}
   GYM_HORARIOS:         '/owner_gym/horarios',     // GET /api/owner_gym/horarios (HU-39: horario de atención, sin restricción de rol)
 
   // Member — Entrenamiento (training_bp en /api/user/training)

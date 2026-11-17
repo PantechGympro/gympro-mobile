@@ -39,7 +39,7 @@ import {
 } from '../../services/pagos';
 import type {
   MembershipResponse, PlansResponse, MembershipPlan, MetodoPago,
-  PaymentsResponse, PaymentItem,
+  PaymentsResponse, PaymentItem, EstadoMembresiaResponse,
 } from '../../types';
 import { estaConectado, useConnectivityStore } from '../../services/offline/connectivity';
 
@@ -80,6 +80,10 @@ export default function MembershipScreen() {
   const { data: plansData, loading: loadingPlans } = useFetch<PlansResponse>(ENDPOINTS.MEMBERSHIP_PLANS);
   const { data: pagosData, loading: loadingPagos, refetch: refetchPagos } =
     useFetch<PaymentsResponse>(ENDPOINTS.USER_PAYMENTS);
+  // Renovación pedida con efectivo/transferencia que recepción aún no confirma.
+  const { data: estadoData, refetch: refetchEstado } =
+    useFetch<EstadoMembresiaResponse>(ENDPOINTS.MEMBERSHIP_ESTADO);
+  const renovacionPendiente = estadoData?.renovacion_pendiente ?? null;
   const conectado = useConnectivityStore((s) => s.conectado);
 
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null);
@@ -131,8 +135,7 @@ export default function MembershipScreen() {
   const pagosFiltrados  = filtroPagos === 'todos' ? todosPagos : todosPagos.filter((p) => p.type === filtroPagos);
   const hayComprasPOS   = todosPagos.some((p) => p.type === 'producto');
 
-  // SCRUM-168 / HU-30: renovar es un movimiento de dinero (incluso en
-  // "Efectivo" — activa la membresía de inmediato) y el ticket exige que
+  // SCRUM-168 / HU-30: renovar es un movimiento de dinero y el ticket exige que
   // NINGÚN movimiento de dinero quede en cola. Se bloquea por completo sin
   // conexión, nunca se encola para reintentar después.
   const doRenew = async () => {
@@ -150,13 +153,19 @@ export default function MembershipScreen() {
         id_membresia: selectedPlan.id_membresia,
         metodo_pago:  metodo,
       });
-      Alert.alert('¡Listo!', `Membresía "${selectedPlan.nombre}" renovada con éxito.`);
+      // El API responde 202: solicitud recibida, NO renovada. La membresía se
+      // activa cuando recepción confirma el pago (nov/2026).
+      Alert.alert(
+        'Solicitud enviada',
+        `Pediste renovar "${selectedPlan.nombre}". Tu membresía se activará cuando recepción confirme tu pago en efectivo; verás la solicitud "en revisión" y te avisaremos.`,
+      );
       setShowRenew(false);
       setSelectedPlan(null);
-      refetch();
+      refetchEstado();
       refetchPagos();
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.error ?? 'No se pudo renovar la membresía');
+      Alert.alert('No se pudo enviar', e?.response?.data?.error ?? 'No se pudo solicitar la renovación');
+      if (e?.response?.data?.codigo === 'renovacion_en_revision') refetchEstado();
     } finally {
       setRenewing(false);
     }
@@ -208,11 +217,11 @@ export default function MembershipScreen() {
     }
 
     Alert.alert(
-      'Confirmar renovación',
-      `${selectedPlan.nombre}\nMétodo: ${metodo}\nTotal: $${selectedPlan.precio}`,
+      'Solicitar renovación',
+      `${selectedPlan.nombre}\nMétodo: ${metodo}\nTotal: $${selectedPlan.precio}\n\nTu membresía se activa cuando recepción confirme tu pago.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: doRenew },
+        { text: 'Solicitar', onPress: doRenew },
       ],
     );
   };
@@ -226,7 +235,7 @@ export default function MembershipScreen() {
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.accent} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { refetch(); refetchEstado(); refetchPagos(); }} tintColor={colors.accent} />}
     >
       <Text style={styles.title} accessibilityRole="header">Membresía y Pagos</Text>
 
@@ -287,16 +296,34 @@ export default function MembershipScreen() {
         </Card>
       )}
 
+      {/* ── Renovación en revisión: no se puede pedir otra hasta que se resuelva ── */}
+      {renovacionPendiente && (
+        <Card>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="time-outline" size={22} color={colors.warning} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>Renovación en revisión</Text>
+              <Text style={styles.emptyText}>
+                {renovacionPendiente.membresia_nombre ?? 'Tu plan'} · ${renovacionPendiente.monto}
+                {' '}({renovacionPendiente.metodo_pago}). Se activa cuando recepción confirme tu pago.
+              </Text>
+            </View>
+          </View>
+        </Card>
+      )}
+
       {/* ── Botón abrir/cerrar apartado de renovación (justo debajo del pase) ── */}
-      <Button
-        label={showRenew ? 'Cerrar' : (membership ? 'Renovar membresía' : 'Contratar plan')}
-        variant={showRenew ? 'secondary' : 'primary'}
-        onPress={() => setShowRenew((v) => !v)}
-        icon={<Ionicons name={showRenew ? 'close' : 'refresh-outline'} size={18} color={showRenew ? colors.text : colors.onAccent} />}
-      />
+      {!renovacionPendiente && (
+        <Button
+          label={showRenew ? 'Cerrar' : (membership ? 'Renovar membresía' : 'Contratar plan')}
+          variant={showRenew ? 'secondary' : 'primary'}
+          onPress={() => setShowRenew((v) => !v)}
+          icon={<Ionicons name={showRenew ? 'close' : 'refresh-outline'} size={18} color={showRenew ? colors.text : colors.onAccent} />}
+        />
+      )}
 
       {/* ── Apartado de renovación ────────────────────────────── */}
-      {showRenew && (
+      {showRenew && !renovacionPendiente && (
         <Card>
           <Text style={styles.sectionTitle}>1. Elige un plan</Text>
           {loadingPlans ? (
@@ -638,7 +665,7 @@ export default function MembershipScreen() {
                     <Text style={styles.payAmount}>${p.amount.toLocaleString('es-MX')}</Text>
                     <Badge
                       label={p.status}
-                      color={p.status === 'Completado' ? 'success' : 'warning'}
+                      color={p.status === 'Completado' ? 'success' : p.status === 'Rechazado' ? 'error' : 'warning'}
                       style={styles.payStatusBadge}
                     />
                   </View>
