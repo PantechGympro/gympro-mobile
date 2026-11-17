@@ -25,6 +25,9 @@ import Badge from '../../components/ui/Badge';
 import { MESES_CORTOS } from '../../components/ui/SelectorPeriodo';
 import type { OwnerDashboard, IngresoMes, ActividadItem } from '../../types';
 import { mensajeAmigable } from '../../utils/errores';
+import { useFuncionesPlan } from '../../hooks/useFuncionesPlan';
+import { avisarPlanNoIncluido } from '../../components/plan/BloqueoPlan';
+import { useAuth } from '../../hooks/useAuth';
 
 /** Sección que el dueño puede incluir o quitar del reporte. */
 interface SeccionReporte { id: string; label: string; descripcion: string }
@@ -41,6 +44,10 @@ function actIcon(tipo: string): React.ComponentProps<typeof Ionicons>['name'] {
 }
 
 export default function ReportsScreen() {
+  // Plan sin reportes en PDF: el resumen sigue disponible, el botón PDF explica el motivo (el API responde 402).
+  const { permite } = useFuncionesPlan();
+  const { user: usuarioPlan } = useAuth();
+  const pdfIncluido = permite('reportes_pdf');
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -156,9 +163,9 @@ export default function ReportsScreen() {
             accessibilityRole="button" accessibilityLabel="Compartir resumen">
             <Ionicons name="share-outline" size={18} color={colors.accent} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.pdfBtn} onPress={() => setShowConfig(true)} disabled={downloading}
-            accessibilityRole="button" accessibilityLabel="Generar reporte en PDF">
-            <Ionicons name={downloading ? 'hourglass-outline' : 'document-text-outline'} size={16} color={colors.onAccent} />
+          <TouchableOpacity style={styles.pdfBtn} onPress={() => (pdfIncluido ? setShowConfig(true) : avisarPlanNoIncluido('Los reportes en PDF', usuarioPlan?.role))} disabled={downloading}
+            accessibilityRole="button" accessibilityLabel={pdfIncluido ? 'Generar reporte en PDF' : 'Reporte en PDF, no incluido en tu plan'}>
+            <Ionicons name={downloading ? 'hourglass-outline' : pdfIncluido ? 'document-text-outline' : 'lock-closed-outline'} size={16} color={colors.onAccent} />
             <Text style={styles.pdfText}>{downloading ? 'Generando…' : 'PDF'}</Text>
           </TouchableOpacity>
         </View>

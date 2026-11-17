@@ -80,6 +80,7 @@ export const ENDPOINTS = {
   LOGIN:              '/auth/login',
   REGISTER:           '/auth/register',
   REFRESH:            '/auth/refresh',           // POST con el token de refresco
+  AUTH_ME:            '/auth/me',                // GET { role, funciones_plan, ... } -- banderas del plan contratado
   LOGOUT:             '/auth/logout',            // POST con el token de refresco -- lo revoca en el servidor
   CAMBIAR_PASSWORD_INICIAL: '/auth/cambiar-password-inicial', // PUT { nueva_password } -- SCRUM-224
   FORGOT_PASSWORD:    '/auth/forgot-password',   // POST { email }

@@ -36,6 +36,7 @@ import api from '../../services/api';
 import type { BodyProgress } from '../../types';
 import { estaConectado } from '../../services/offline/connectivity';
 import { encolarAccion } from '../../services/offline/queue';
+import { useFuncionesPlan } from '../../hooks/useFuncionesPlan';
 
 const SCREEN_W = Dimensions.get('window').width;
 const RANGOS_PROYECCION = [30, 60, 90];
@@ -91,10 +92,20 @@ export default function ProgressScreen() {
   /** Rango de peso saludable (criterio OMS) que devuelve el backend. */
   const [rango, setRango] = useState<any>(null);
 
+  const { permite } = useFuncionesPlan();
+  const prediccionIncluida = permite('analiticas_ia'); // true mientras no se sabe (no bloquear por duda)
+
   const cargarPrediccion = useCallback(async () => {
     // Menos de 3 registros: ni siquiera se pide al backend (así lo hacía
     // prediccion.tsx) -- se muestra la tarjeta informativa en su lugar.
     if (!user?.id || sorted.length < 3) { setPredLoading(false); return; }
+    // La predicción es una analítica con IA: si el plan del gimnasio no la incluye
+    // (el API respondería 402) se explica con calma y el resto del progreso sigue igual.
+    if (!prediccionIncluida) {
+      setPred([]); setPredLoading(false);
+      setPredError('La proyección de peso con IA no está activa en tu gimnasio por ahora. Tus medidas y tu progreso siguen funcionando con normalidad.');
+      return;
+    }
     setPredLoading(true); setPredError(null);
     try {
       const res = await api.get(`/analytics/regresion/predecir/${user.id}?dias=${diasProyeccion}`);
@@ -102,13 +113,15 @@ export default function ProgressScreen() {
       const p = (d.predicciones_futuras ?? []).map(pesoVal).filter((x: any): x is number => x != null);
       setPred(p);
       setRango(d.rango_saludable ?? null);
-    } catch {
+    } catch (e: any) {
       setPred([]);
-      setPredError('No se pudo calcular la predicción. Intenta de nuevo más tarde.');
+      setPredError(e?.response?.status === 402
+        ? 'La proyección de peso con IA no está activa en tu gimnasio por ahora. Tus medidas y tu progreso siguen funcionando con normalidad.'
+        : 'No se pudo calcular la predicción. Intenta de nuevo más tarde.');
     } finally {
       setPredLoading(false);
     }
-  }, [user?.id, diasProyeccion, sorted.length]);
+  }, [user?.id, diasProyeccion, sorted.length, prediccionIncluida]);
 
   useEffect(() => { cargarPrediccion(); }, [cargarPrediccion]);
 

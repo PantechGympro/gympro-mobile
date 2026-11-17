@@ -33,6 +33,7 @@ import api from '../../services/api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import BotonesPago from '../../components/BotonesPago';
 import { mensajeAmigable } from '../../utils/errores';
+import FuncionesPorRol, { FuncionesPorRolMap } from '../../components/plan/FuncionesPorRol';
 
 /** Método con el que la plataforma puede cobrar de forma recurrente. */
 interface MetodoRecurrente {
@@ -68,6 +69,7 @@ interface Plan {
   precio_display?:    string;
   max_miembros?:      number | null;
   caracteristicas?:   string[];
+  funciones_por_rol?: FuncionesPorRolMap;   // todo lo que incluye, por rol (catálogo del API)
   destacado?:         boolean;
   orden?:             number;
   activo?:            boolean;
@@ -542,6 +544,8 @@ export default function SuscripcionScreen() {
                   ))}
                 </View>
               ) : null}
+
+              <FuncionesPorRol plan={p} planes={planes} />
 
               {actual ? (
                 <View style={styles.planActualNota}>

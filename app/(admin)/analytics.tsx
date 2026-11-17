@@ -22,6 +22,7 @@ import Badge from '../../components/ui/Badge';
 import type {
   KMeansResponse, ClusterResumen, CancelacionesResponse, PrediccionCancelacion,
 } from '../../types';
+import { conFuncionDePlan } from '../../components/plan/BloqueoPlan';
 
 type Tab = 'segmentos' | 'cancelacion';
 
@@ -34,7 +35,7 @@ function riesgoColor(r: string): 'error' | 'warning' | 'success' {
   return 'success';
 }
 
-export default function AnalyticsScreen() {
+function AnalyticsScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -218,3 +219,5 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     modelInfo:{ color: colors.textMuted, fontSize: 11 * fs, textAlign: 'center' },
   });
 }
+
+export default conFuncionDePlan(AnalyticsScreen, 'analiticas_ia', 'Las analíticas con IA');

@@ -36,6 +36,7 @@ import TicketVenta, { TicketVentaData } from '../../components/admin/TicketVenta
 import { useAuth } from '../../hooks/useAuth';
 import * as Haptics from 'expo-haptics';
 import { estaConectado, useConnectivityStore } from '../../services/offline/connectivity';
+import { conFuncionDePlan } from '../../components/plan/BloqueoPlan';
 
 type Tab = 'productos' | 'historial';
 
@@ -87,7 +88,7 @@ function ProductImage({ uri, size, colors }: { uri?: string; size: number; color
   );
 }
 
-export default function MemberPOSScreen() {
+function MemberPOSScreen() {
   const colors = useColors();
   const fs     = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -725,3 +726,5 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   pickupChipTextActive: { color: colors.onAccent },
 });
 }
+
+export default conFuncionDePlan(MemberPOSScreen, 'pos', 'La tienda del gimnasio');
