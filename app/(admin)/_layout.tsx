@@ -10,7 +10,10 @@ interface Screen { name: string; title: string; icon: IconName; iconActive: Icon
 const SCREENS: Screen[] = [
   { name: 'index',       title: 'Dashboard',      icon: 'grid-outline',          iconActive: 'grid'          },
   { name: 'members',     title: 'Miembros',        icon: 'people-outline',        iconActive: 'people'        },
+  { name: 'checkin',     title: 'Registrar entrada', icon: 'log-in-outline',      iconActive: 'log-in'        },
+  { name: 'por-vencer',  title: 'Por vencer',      icon: 'time-outline',          iconActive: 'time'          },
   { name: 'payments',    title: 'Pagos',           icon: 'cash-outline',          iconActive: 'cash'          },
+  { name: 'por-confirmar', title: 'Pagos por confirmar', icon: 'checkmark-done-outline', iconActive: 'checkmark-done' },
   { name: 'pos',         title: 'Punto de Venta',  icon: 'cart-outline',          iconActive: 'cart'          },
   { name: 'reports',     title: 'Reportes',        icon: 'stats-chart-outline',   iconActive: 'stats-chart'   },
   { name: 'analytics',   title: 'Analítica IA',    icon: 'sparkles-outline',      iconActive: 'sparkles'      },

@@ -32,6 +32,8 @@ import { toStr, toArray, toDateStr } from '../../utils/format';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import BotonesPago from '../../components/BotonesPago';
+import { mensajeAmigable } from '../../utils/errores';
+import FuncionesPorRol, { FuncionesPorRolMap } from '../../components/plan/FuncionesPorRol';
 
 /** Método con el que la plataforma puede cobrar de forma recurrente. */
 interface MetodoRecurrente {
@@ -67,6 +69,7 @@ interface Plan {
   precio_display?:    string;
   max_miembros?:      number | null;
   caracteristicas?:   string[];
+  funciones_por_rol?: FuncionesPorRolMap;   // todo lo que incluye, por rol (catálogo del API)
   destacado?:         boolean;
   orden?:             number;
   activo?:            boolean;
@@ -204,11 +207,11 @@ export default function SuscripcionScreen() {
     try {
       const r = await api.post(ENDPOINTS.BILLING_RECURRENTE, { proveedor, origen: 'mobile' });
       const url = r.data?.url_autorizacion;
-      if (!url) throw new Error('La pasarela no devolvió la URL de autorización.');
+      if (!url) throw new Error('El servicio de pagos no respondió como esperábamos. Inténtalo de nuevo en unos minutos.');
       await Linking.openURL(url);
       // Al volver, useFocusEffect dispara la sincronización y confirma el estado.
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.msg ?? e?.message ?? 'No se pudo iniciar la autorización.');
+      Alert.alert('No pudimos iniciar la autorización', mensajeAmigable(e));
     } finally {
       setProcesando(false);
     }
@@ -541,6 +544,8 @@ export default function SuscripcionScreen() {
                   ))}
                 </View>
               ) : null}
+
+              <FuncionesPorRol plan={p} planes={planes} />
 
               {actual ? (
                 <View style={styles.planActualNota}>

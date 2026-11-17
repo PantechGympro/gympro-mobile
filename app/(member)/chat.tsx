@@ -16,6 +16,7 @@
  * GET/POST/DELETE /api/user/training/pt-request → solicitudes de PT (pendiente|aceptada|rechazada)
  */
 import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
   RefreshControl, TextInput, KeyboardAvoidingView, Platform, Alert, Image,
@@ -67,7 +68,7 @@ function trainerName(t: Trainer) {
   return toStr(t.nombre ?? t.name, 'Entrenador');
 }
 
-export default function MemberChatScreen() {
+function MemberChatScreen() {
   const colors  = useColors();
   const fs      = useFontScale();
   const styles  = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -501,3 +502,6 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   sendBtnDisabled: { opacity: 0.4 },
 });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(MemberChatScreen, 'el chat con tu entrenador');

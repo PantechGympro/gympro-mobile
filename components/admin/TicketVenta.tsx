@@ -45,6 +45,8 @@ export interface TicketVentaData {
   metodo_pago?:    string;
   nombre_miembro?: string;
   items?:          TicketItem[];
+  /** 'pendiente' = el pago aún no lo verifica el personal: no es un comprobante de pago. */
+  estado_pago?:    string | null;
 }
 
 interface Props {
@@ -92,7 +94,7 @@ export default function TicketVenta({ venta, gimnasio, onClose }: Props) {
   const compartir = async () => {
     const lineas = [
       encabeza,
-      'Comprobante de venta',
+      venta.estado_pago === 'pendiente' ? 'Solicitud de compra (pago por confirmar)' : 'Comprobante de venta',
       folio(venta),
       fechaLegible(venta.fecha),
       venta.nombre_miembro ? `Cliente: ${toStr(venta.nombre_miembro)}` : '',
@@ -117,7 +119,7 @@ export default function TicketVenta({ venta, gimnasio, onClose }: Props) {
       <View style={styles.overlay}>
         <View style={styles.hoja}>
           <View style={styles.barra}>
-            <Text style={styles.barraTxt}>Comprobante de venta</Text>
+            <Text style={styles.barraTxt}>{venta.estado_pago === 'pendiente' ? 'Solicitud de compra' : 'Comprobante de venta'}</Text>
             <TouchableOpacity
               onPress={onClose}
               accessibilityLabel="Cerrar comprobante"
@@ -176,7 +178,19 @@ export default function TicketVenta({ venta, gimnasio, onClose }: Props) {
               <Text style={styles.metodo}>Pago con {toStr(venta.metodo_pago)}</Text>
             )}
 
-            <Text style={styles.gracias}>Gracias por su compra</Text>
+            {venta.estado_pago === 'pendiente' && (
+              <View style={styles.aviso}>
+                <Text style={styles.avisoTit}>Pago pendiente de confirmar</Text>
+                <Text style={styles.avisoTxt}>
+                  Recepción debe verificar tu pago ({toStr(venta.metodo_pago)}). No es un comprobante
+                  de pago hasta que se confirme.
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.gracias}>
+              {venta.estado_pago === 'pendiente' ? 'Gracias, te esperamos' : 'Gracias por su compra'}
+            </Text>
           </ScrollView>
 
           <TouchableOpacity
@@ -211,6 +225,10 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     },
     barraTxt: { color: colors.textSecondary, fontSize: 12 * fs },
     cuerpo:   { paddingHorizontal: 22, paddingBottom: 18 },
+    aviso:    { marginTop: 12, padding: 10, borderRadius: 10, backgroundColor: colors.warningBg,
+                borderWidth: 1, borderColor: colors.warning },
+    avisoTit: { color: colors.text, fontSize: 12 * fs, fontWeight: '700' },
+    avisoTxt: { color: colors.textSecondary, fontSize: 12 * fs, marginTop: 2, lineHeight: 17 * fs },
 
     cabecera: {
       alignItems: 'center', paddingVertical: 14,

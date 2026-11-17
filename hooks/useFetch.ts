@@ -21,6 +21,7 @@
 import React from 'react';
 import api from '../services/api';
 import { guardarCache, leerCache } from '../services/offline/cache';
+import { mensajeAmigable } from '../utils/errores';
 
 interface FetchState<T> {
   data:      T | null;
@@ -86,13 +87,11 @@ export function useFetch<T>(
               setCachedAt(entrada.actualizadoEn);
               setError(null);
             } else {
-              setError(err?.message ?? 'Sin conexión y sin datos guardados');
+              setError('Sin conexión y aún no hay datos guardados en tu teléfono. Conéctate a internet para cargarlos.');
             }
           });
         }
-        setError(
-          err?.response?.data?.error ?? err?.message ?? 'Error desconocido',
-        );
+        setError(mensajeAmigable(err));
       })
       .finally(() => {
         setLoading(false);

@@ -80,6 +80,7 @@ export const ENDPOINTS = {
   LOGIN:              '/auth/login',
   REGISTER:           '/auth/register',
   REFRESH:            '/auth/refresh',           // POST con el token de refresco
+  AUTH_ME:            '/auth/me',                // GET { role, funciones_plan, ... } -- banderas del plan contratado
   LOGOUT:             '/auth/logout',            // POST con el token de refresco -- lo revoca en el servidor
   CAMBIAR_PASSWORD_INICIAL: '/auth/cambiar-password-inicial', // PUT { nueva_password } -- SCRUM-224
   FORGOT_PASSWORD:    '/auth/forgot-password',   // POST { email }
@@ -92,6 +93,7 @@ export const ENDPOINTS = {
   USER_PROFILE:       '/user/profile',           // GET  /api/user/profile
   USER_PROFILE_PHOTO: '/user/profile/photo',     // POST /api/user/profile/photo (multipart, campo "foto")
   USER_MEMBERSHIP:    '/user/membership',        // GET  /api/user/membership
+  MEMBERSHIP_ESTADO:  '/user/membership/estado', // GET  /api/user/membership/estado (siempre disponible)
   MEMBERSHIP_PLANS:   '/user/membership/plans',  // GET  /api/user/membership/plans
   MEMBERSHIP_RENEW:   '/user/membership/renew',  // POST /api/user/membership/renew
   USER_PROGRESS:      '/user/progress',          // POST /api/user/progress
@@ -164,6 +166,9 @@ export const ENDPOINTS = {
   RECEP_CHECKINS:     '/recepcionista/checkins',   // GET/POST check-ins de hoy
   RECEP_MEMBERS:      '/recepcionista/members',    // GET ?q= lista de miembros
   RECEP_PAYMENTS:     '/recepcionista/payments',   // GET pagos
+  MEMBRESIAS_POR_VENCER: '/membresias/por-vencer',     // GET ?dias=&incluir_vencidas= (Propietario/Admin/Recepción)
+  CHECKIN_MANUAL_BUSCAR: '/checkins/manual/buscar',    // GET ?q= (Propietario/Admin)
+  CHECKIN_MANUAL:        '/checkins/manual',           // POST { id_miembro } (Propietario/Admin)
 
   // Rutas compartidas sin prefix (url hardcodeada)
   MIEMBROS:           '/miembros',               // GET /api/miembros  (paginado)
@@ -193,6 +198,8 @@ export const ENDPOINTS = {
   USER_PRODUCTOS:       '/owner_gym/productos',    // GET /api/owner_gym/productos (catálogo visible al miembro)
   USER_VENTAS:          '/ventas',                 // GET /api/ventas (historial filtrado por gimnasio)
   USER_COMPRAR:         '/ventas',                 // POST /api/ventas (registrar compra)
+  // Staff (recepción/administración/propietario): pagos del miembro por verificar
+  CONFIRMACIONES_PAGO:  '/confirmaciones-pago',    // GET lista; POST /{ventas|renovaciones}/<id>/{confirmar|rechazar}
   GYM_HORARIOS:         '/owner_gym/horarios',     // GET /api/owner_gym/horarios (HU-39: horario de atención, sin restricción de rol)
 
   // Member — Entrenamiento (training_bp en /api/user/training)

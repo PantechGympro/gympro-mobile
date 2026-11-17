@@ -22,6 +22,7 @@
  * animación de ScanningOverlay en vez de su preview rota.
  */
 import React, { useState, useCallback, useEffect } from 'react';
+import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult, type ScanningResult } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,7 +37,7 @@ import { ENDPOINTS } from '../../constants/Api';
 
 type Estado = 'escaneando' | 'enviando' | 'exito' | 'ya_registrado' | 'expirado' | 'error';
 
-export default function CheckinQr() {
+function CheckinQr() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemoStyles(colors, fs);
@@ -207,3 +208,6 @@ function useMemoStyles(colors: ReturnType<typeof useColors>, fs: number) {
     subtitle: { color: colors.textSecondary, fontSize: 13 * fs, textAlign: 'center' },
   }), [colors, fs]);
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(CheckinQr, 'el registro de entrada');

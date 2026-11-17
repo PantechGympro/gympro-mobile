@@ -27,6 +27,10 @@ import api from '../../services/api';
 import { downloadAndShare } from '../../services/download';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
+import { mensajeAmigable } from '../../utils/errores';
+import { useFuncionesPlan } from '../../hooks/useFuncionesPlan';
+import { avisarPlanNoIncluido } from '../../components/plan/BloqueoPlan';
+import { useAuth } from '../../hooks/useAuth';
 
 const RANGOS: { id: string; label: string }[] = [
   { id: 'week',    label: 'Semana' },
@@ -41,6 +45,9 @@ interface SeccionReporte { id: string; label: string; descripcion: string }
 interface OpcionesReporte { anios: number[]; secciones: SeccionReporte[] }
 
 export default function TrainerReportsScreen() {
+  const { permite } = useFuncionesPlan();
+  const { user: usuarioPlan } = useAuth();
+  const pdfIncluido = permite('reportes_pdf');
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -122,7 +129,7 @@ export default function TrainerReportsScreen() {
         setConfig(false);
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'No se pudo generar el reporte.');
+      Alert.alert('No pudimos generar el reporte', mensajeAmigable(e));
     } finally {
       setDescargando(false);
     }
@@ -155,11 +162,11 @@ export default function TrainerReportsScreen() {
         </View>
         <TouchableOpacity
           style={styles.shareBtn}
-          onPress={() => setConfig(true)}
-          accessibilityLabel="Descargar reporte en PDF"
+          onPress={() => (pdfIncluido ? setConfig(true) : avisarPlanNoIncluido('Los reportes en PDF', usuarioPlan?.role))}
+          accessibilityLabel={pdfIncluido ? 'Descargar reporte en PDF' : 'Reporte en PDF, no incluido en tu plan'}
           accessibilityRole="button"
         >
-          <Ionicons name="download-outline" size={20} color={colors.accent} />
+          <Ionicons name={pdfIncluido ? 'download-outline' : 'lock-closed-outline'} size={20} color={colors.accent} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.shareBtn} onPress={compartir} accessibilityLabel="Compartir resumen">
           <Ionicons name="share-outline" size={20} color={colors.accent} />

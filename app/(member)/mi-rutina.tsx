@@ -18,6 +18,7 @@
  *             piden el detalle por id porque la lista no lo trae completo).
  */
 import React, { useState, useMemo, useCallback } from 'react';
+import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, RefreshControl,
 } from 'react-native';
@@ -67,7 +68,7 @@ const nuevoEj = (): Ej => ({ nombre: '', series: '4', reps: '12', peso: '', unid
 const nuevoDia = (): Dia => ({ dia: 'Lunes', grupo: 'pecho', ejercicios: [nuevoEj()] });
 const rutinaVacia = (): Rutina => ({ nombre: '', dias: [nuevoDia()] });
 
-export default function MiRutinaScreen() {
+function MiRutinaScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -569,3 +570,6 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
     },
   });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(MiRutinaScreen, 'tus rutinas');

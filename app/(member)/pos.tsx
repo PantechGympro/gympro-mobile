@@ -36,6 +36,7 @@ import TicketVenta, { TicketVentaData } from '../../components/admin/TicketVenta
 import { useAuth } from '../../hooks/useAuth';
 import * as Haptics from 'expo-haptics';
 import { estaConectado, useConnectivityStore } from '../../services/offline/connectivity';
+import { conFuncionDePlan } from '../../components/plan/BloqueoPlan';
 
 type Tab = 'productos' | 'historial';
 
@@ -62,7 +63,7 @@ interface Compra {
   fecha_recogida?:  string | null;
   hora_recogida?:   string | null;
   // nov/2026: pago en efectivo que sigue sin cobrarse en recepcion
-  estado_pago?:     'pendiente' | 'pagado' | null;
+  estado_pago?:     'pendiente' | 'pagado' | 'rechazado' | null;
 }
 
 interface Cart { [id: string]: { producto: Producto; cantidad: number } }
@@ -87,7 +88,7 @@ function ProductImage({ uri, size, colors }: { uri?: string; size: number; color
   );
 }
 
-export default function MemberPOSScreen() {
+function MemberPOSScreen() {
   const colors = useColors();
   const fs     = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -252,7 +253,7 @@ export default function MemberPOSScreen() {
       refetchP();
       Alert.alert(
         'Compra registrada',
-        `Tu pago queda pendiente hasta que pases a recepción. Avisamos al personal: tu producto te espera ${diaLabel.toLowerCase()} a las ${pickupTime}, y ahí pagas en efectivo.`,
+        `Tu pago queda pendiente hasta que recepción lo confirme. Avisamos al personal: pasa por tu producto ${diaLabel.toLowerCase()} a las ${pickupTime} y paga en efectivo; se te entrega cuando se verifique el pago.`,
       );
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.error ?? 'No se pudo procesar la compra');
@@ -408,11 +409,16 @@ export default function MemberPOSScreen() {
                       label={`Pasas por él el ${c.fecha_recogida} a las ${c.hora_recogida}`}
                       color="warning"
                     />
-                    {/* nov/2026: el pago en efectivo se cobra hasta que recepcion
-                        lo recibe -- hasta entonces, queda pendiente. */}
+                    {/* nov/2026: el pago que declara el miembro no cuenta hasta que
+                        el personal lo verifica -- hasta entonces, queda pendiente. */}
                     {c.estado_pago === 'pendiente' && (
-                      <Badge label="Pago pendiente (efectivo)" color="warning" />
+                      <Badge label="Pago por confirmar" color="warning" />
                     )}
+                  </View>
+                )}
+                {c.estado_pago === 'rechazado' && (
+                  <View style={{ marginTop: 6 }}>
+                    <Badge label="Pago no confirmado · compra cancelada" color="error" />
                   </View>
                 )}
                 {c.estado_entrega === 'entregado' && (
@@ -725,3 +731,5 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   pickupChipTextActive: { color: colors.onAccent },
 });
 }
+
+export default conFuncionDePlan(MemberPOSScreen, 'pos', 'La tienda del gimnasio');

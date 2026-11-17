@@ -26,10 +26,13 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
     if (this.state.error) {
       return (
         <View style={eb.container}>
-          <Text style={eb.title}>Error al iniciar GymPro</Text>
+          <Text style={eb.title}>GymPro no pudo iniciar</Text>
           <ScrollView>
-            <Text style={eb.msg}>{this.state.error?.message}</Text>
-            <Text style={eb.stack}>{this.state.error?.stack}</Text>
+            <Text style={eb.msg}>
+              Cierra la app por completo y vuelve a abrirla. Si el problema continúa, actualiza GymPro o avisa a tu gimnasio.
+            </Text>
+            {/* Detalle técnico solo en desarrollo: en producción no se expone el stack al usuario. */}
+            {__DEV__ && <Text style={eb.stack}>{this.state.error?.stack}</Text>}
           </ScrollView>
         </View>
       );

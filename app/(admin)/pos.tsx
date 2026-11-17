@@ -32,6 +32,7 @@ import SelectorPeriodo, { etiquetaPeriodo } from '../../components/ui/SelectorPe
 import Paginador from '../../components/ui/Paginador';
 import TicketVenta, { TicketVentaData } from '../../components/admin/TicketVenta';
 import { useAuth } from '../../hooks/useAuth';
+import { conFuncionDePlan } from '../../components/plan/BloqueoPlan';
 
 type Tab = 'productos' | 'ventas';
 
@@ -116,7 +117,7 @@ interface ProductosResponse {
   total?: number;
 }
 
-export default function POSScreen() {
+function POSScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -744,3 +745,5 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   nota:        { color: colors.textMuted, fontSize: 11.5 * fs, textAlign: 'center', marginTop: 12 },
 });
 }
+
+export default conFuncionDePlan(POSScreen, 'pos', 'El Punto de Venta');

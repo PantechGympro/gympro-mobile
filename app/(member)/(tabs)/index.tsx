@@ -3,6 +3,7 @@
  * Muestra: saludo, racha, KPIs, membresía, rutina de hoy, logros.
  */
 import React, { useMemo, useEffect } from 'react';
+import BannerMembresia from '../../../components/membresias/BannerMembresia';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
@@ -79,6 +80,7 @@ export default function MemberDashboard() {
         />
       }
     >
+      <BannerMembresia />
       {/* ── Header ── */}
       <View style={styles.topBar}>
         <View>

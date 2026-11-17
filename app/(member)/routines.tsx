@@ -2,6 +2,7 @@
  * Pantalla Mis Rutinas — selector de día + lista de ejercicios.
  */
 import React, { useState, useEffect, useMemo } from 'react';
+import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
 } from 'react-native';
@@ -18,7 +19,7 @@ import type { DashboardData, Exercise } from '../../types';
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const DAYS_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-export default function RoutinesScreen() {
+function RoutinesScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -202,3 +203,6 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   tipsText: { color: colors.text, fontSize: 13 * fs, flex: 1, lineHeight: 18 },
 });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(RoutinesScreen, 'tus rutinas');

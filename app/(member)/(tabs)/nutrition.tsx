@@ -17,6 +17,7 @@
  *   estructurado, solo el nombre libre que puso el entrenador o el socio.
  */
 import React, { useState, useMemo } from 'react';
+import { conMembresiaVigente } from '../../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, FlatList, Image,
 } from 'react-native';
@@ -101,7 +102,7 @@ function detalleComida(c: ComidaDieta): string[] {
   return [...alimentos, ...recetas];
 }
 
-export default function NutritionScreen() {
+function NutritionScreen() {
   const colors = useColors();
   const fs = useFontScale();
   const styles = useMemo(() => make_styles(colors, fs), [colors, fs]);
@@ -560,3 +561,6 @@ function make_styles(colors: ReturnType<typeof useColors>, fs = 1) {
   aguaPaso:     { color: colors.textSecondary, fontSize: 12 * fs, fontWeight: '600', minWidth: 60, textAlign: 'center' },
 });
 }
+
+// Con la membresía vencida este módulo se reemplaza por un aviso empático (ver MembresiaGate).
+export default conMembresiaVigente(NutritionScreen, 'tu plan de nutrición');
