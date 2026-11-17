@@ -238,11 +238,10 @@ export default function ProfileScreen() {
       const nombreArchivo = asset.fileName || `foto_perfil.${ext}`;
       await subirFotoPerfil(asset.uri, mime, nombreArchivo);
     } catch (e: any) {
+      // Sin jerga técnica ni detalles internos: solo qué pasó y cómo resolverlo.
       Alert.alert(
-        'No se pudo abrir el selector de fotos',
-        e?.message
-          ? `${e.message}\n\nSi acabas de actualizar la app, puede que haga falta generar un build nuevo (expo run:android / run:ios) para que el permiso de fotos quede registrado.`
-          : 'Intenta de nuevo. Si sigue fallando, puede que haga falta generar un build nuevo de la app (expo run:android / run:ios).',
+        'No pudimos abrir tus fotos',
+        'Revisa que GymPro tenga permiso para acceder a tus fotos en los ajustes del teléfono e inténtalo de nuevo.',
       );
     }
   };

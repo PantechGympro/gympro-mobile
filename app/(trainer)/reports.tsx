@@ -27,6 +27,7 @@ import api from '../../services/api';
 import { downloadAndShare } from '../../services/download';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
+import { mensajeAmigable } from '../../utils/errores';
 
 const RANGOS: { id: string; label: string }[] = [
   { id: 'week',    label: 'Semana' },
@@ -122,7 +123,7 @@ export default function TrainerReportsScreen() {
         setConfig(false);
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'No se pudo generar el reporte.');
+      Alert.alert('No pudimos generar el reporte', mensajeAmigable(e));
     } finally {
       setDescargando(false);
     }

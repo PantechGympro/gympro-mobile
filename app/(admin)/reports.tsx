@@ -24,6 +24,7 @@ import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import { MESES_CORTOS } from '../../components/ui/SelectorPeriodo';
 import type { OwnerDashboard, IngresoMes, ActividadItem } from '../../types';
+import { mensajeAmigable } from '../../utils/errores';
 
 /** Sección que el dueño puede incluir o quitar del reporte. */
 interface SeccionReporte { id: string; label: string; descripcion: string }
@@ -122,7 +123,7 @@ export default function ReportsScreen() {
       if (!r.ok) Alert.alert('No se pudo descargar', r.reason ?? 'Intenta de nuevo.');
       else setShowConfig(false);
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'No se pudo generar el reporte.');
+      Alert.alert('No pudimos generar el reporte', mensajeAmigable(e));
     } finally {
       setDownloading(false);
     }

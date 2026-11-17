@@ -122,7 +122,7 @@ function VideoPlayer({ exercise, colors, fs }: { exercise: ExerciseDetail; color
       }
       setFileUri(path);
     } catch (e: any) {
-      setError(e?.message ?? 'Error desconocido');
+      setError('No pudimos abrir el archivo del ejercicio. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
