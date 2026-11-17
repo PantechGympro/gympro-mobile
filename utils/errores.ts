@@ -12,6 +12,7 @@
 export function mensajePorEstado(status?: number): string {
   if (!status) return 'No pudimos conectar con GymPro. Revisa tu conexión a internet e inténtalo de nuevo.';
   if (status === 401) return 'Tu sesión terminó. Vuelve a iniciar sesión para continuar.';
+  if (status === 402) return 'Esta función no está incluida en el plan actual del gimnasio. Pide al propietario que revise las opciones de plan.';
   if (status === 403) return 'Tu cuenta no tiene permiso para hacer esto. Si crees que es un error, avisa al gimnasio.';
   if (status === 404) return 'No encontramos lo que buscabas. Puede que ya no exista.';
   if (status === 408 || status === 504) return 'La respuesta tardó demasiado. Inténtalo de nuevo en unos segundos.';

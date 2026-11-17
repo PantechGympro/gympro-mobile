@@ -164,6 +164,9 @@ export const ENDPOINTS = {
   RECEP_CHECKINS:     '/recepcionista/checkins',   // GET/POST check-ins de hoy
   RECEP_MEMBERS:      '/recepcionista/members',    // GET ?q= lista de miembros
   RECEP_PAYMENTS:     '/recepcionista/payments',   // GET pagos
+  MEMBRESIAS_POR_VENCER: '/membresias/por-vencer',     // GET ?dias=&incluir_vencidas= (Propietario/Admin/Recepción)
+  CHECKIN_MANUAL_BUSCAR: '/checkins/manual/buscar',    // GET ?q= (Propietario/Admin)
+  CHECKIN_MANUAL:        '/checkins/manual',           // POST { id_miembro } (Propietario/Admin)
 
   // Rutas compartidas sin prefix (url hardcodeada)
   MIEMBROS:           '/miembros',               // GET /api/miembros  (paginado)
