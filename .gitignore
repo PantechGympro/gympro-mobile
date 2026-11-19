@@ -30,3 +30,6 @@ android/app/build/
 android/.gradle/
 android/.cxx/
 android/app/.cxx/
+
+# Cobertura de pruebas
+coverage/
