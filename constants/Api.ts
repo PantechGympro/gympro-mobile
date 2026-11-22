@@ -75,6 +75,21 @@ if (__DEV__) {
  *  Shared     miembros_bp / pagos url hardcodeada /api/miembros, /api/pagos
  *  Shared     notificaciones_bp   url_prefix="/api/notificaciones"
  */
+/**
+ * Cabecera con la que esta app se identifica ante el API.
+ *
+ * El plan del gimnasio puede incluir o no la app movil (bandera `app_movil`).
+ * El servidor necesita distinguir "entro desde la app" de "entro desde la web"
+ * para hacerla valer, y el User-Agent de una app Expo no es estable entre
+ * versiones ni entre plataformas. Con una cabecera propia es explicito.
+ *
+ * Si falta, el servidor NO bloquea: una version instalada vieja sigue
+ * funcionando hasta que se actualice, en vez de dejar a alguien fuera.
+ */
+export const CABECERA_CLIENTE = 'X-GymPro-Client';
+export const CLIENTE_MOVIL = 'movil';
+export const CABECERAS_CLIENTE = { [CABECERA_CLIENTE]: CLIENTE_MOVIL } as const;
+
 export const ENDPOINTS = {
   // ── Auth ──────────────────────────────────────────────────────────────────
   LOGIN:              '/auth/login',
