@@ -12,7 +12,7 @@
  */
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { API_BASE_URL, ENDPOINTS } from '../constants/Api';
+import { API_BASE_URL, CABECERAS_CLIENTE, ENDPOINTS } from '../constants/Api';
 import type { AuthUser } from '../types';
 import api from './api';
 
@@ -38,7 +38,10 @@ export async function loginRequest(
   const res = await axios.post<LoginResponse>(
     `${API_BASE_URL}${ENDPOINTS.LOGIN}`,
     { email, password },
-    { timeout: 15_000 }
+    // La cabecera de cliente va aqui tambien: este login usa axios directo,
+    // no la instancia `api` que la lleva por defecto. Sin ella el servidor no
+    // sabria que el intento viene de la app y no podria aplicar `app_movil`.
+    { timeout: 15_000, headers: { ...CABECERAS_CLIENTE } }
   );
   return res.data;
 }

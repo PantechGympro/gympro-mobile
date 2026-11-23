@@ -12,7 +12,7 @@
  */
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { API_BASE_URL, ENDPOINTS } from '../constants/Api';
+import { API_BASE_URL, CABECERA_CLIENTE, CLIENTE_MOVIL, ENDPOINTS } from '../constants/Api';
 
 let _gymId: number | null = null;
 let _onUnauthorized: (() => void) | null = null;
@@ -25,7 +25,12 @@ export function configureApi(gymId: number | null, onUnauthorized: () => void) {
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15_000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    // Identifica a la app ante el API: el plan del gimnasio decide si la app
+    // movil esta incluida (ver constants/Api.ts).
+    [CABECERA_CLIENTE]: CLIENTE_MOVIL,
+  },
 });
 
 // Request interceptor — adjuntar JWT y gym tenant
