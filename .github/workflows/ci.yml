@@ -1,25 +1,60 @@
 name: CI
 
+# Quality gate de la app móvil (SCRUM-182).
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  typecheck:
+  typecheck-y-pruebas:
+    name: Tipos (tsc) y pruebas con cobertura
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: "npm"
 
       - name: Instalar dependencias
-        run: npm ci
+        # --ignore-scripts: el postinstall (patch-package) solo aplica parches de módulos
+        # nativos que no intervienen en tsc ni en las pruebas de utilidades.
+        run: npm ci --ignore-scripts
 
       - name: Chequeo de tipos (TypeScript)
-        run: npx tsc --noEmit
+        run: npm run typecheck
+
+      - name: Pruebas unitarias + cobertura (umbral en package.json → "jest.coverageThreshold")
+        run: npm run test:ci
+        env:
+          CI: true
+
+      - name: Resumen de cobertura en el job
+        if: always()
+        run: |
+          {
+            echo "### Cobertura de la app móvil (utilidades)"
+            echo '```'
+            node -e 'const s=require("./coverage/coverage-summary.json").total;for(const k of ["statements","branches","functions","lines"])console.log(k.padEnd(11),s[k].pct+" %")' 2>/dev/null || echo "sin datos de cobertura"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mobile-cobertura
+          path: coverage/
+          retention-days: 30
