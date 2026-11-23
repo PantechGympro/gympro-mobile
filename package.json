@@ -7,7 +7,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.13",
@@ -57,9 +60,41 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
+    "@jest/globals": "^29.7.0",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.14",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
     "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "testEnvironment": "node",
+    "globalSetup": "<rootDir>/jest.global-setup.js",
+    "testMatch": [
+      "<rootDir>/utils/**/__tests__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.[jt]sx?$": "babel-jest"
+    },
+    "collectCoverageFrom": [
+      "utils/**/*.ts",
+      "!utils/**/__tests__/**"
+    ],
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "lcov",
+      "json-summary"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 90,
+        "lines": 90,
+        "functions": 90,
+        "branches": 80
+      }
+    }
+  }
 }
