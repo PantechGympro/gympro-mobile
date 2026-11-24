@@ -19,7 +19,7 @@ import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { conMembresiaVigente } from '../../components/membresias/MembresiaGate';
 import {
   View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
-  RefreshControl, TextInput, KeyboardAvoidingView, Platform, Alert, Image,
+  RefreshControl, TextInput, KeyboardAvoidingView, Alert, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -276,7 +276,7 @@ function MemberChatScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.screen, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={insets.top + 56}
     >
       {/* Selector de entrenador (si hay varios) */}
