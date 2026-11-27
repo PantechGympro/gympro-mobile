@@ -27,6 +27,7 @@ import Card from '../../components/ui/Card';
 import AccessibilityPanel from '../../components/settings/AccessibilityPanel';
 import * as Haptics from 'expo-haptics';
 import Badge from '../../components/ui/Badge';
+import PantallaConTeclado from '../../components/ui/PantallaConTeclado';
 
 /** Persona propietaria, tal como la devuelve el endpoint. */
 interface Propietario {
@@ -152,6 +153,7 @@ export default function AdminProfileScreen() {
   const roleLabel     = user?.role === 'owner_gym' ? 'Owner / Propietario' : 'Administrador';
 
   return (
+    <PantallaConTeclado>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -348,6 +350,7 @@ export default function AdminProfileScreen() {
       </View>
       <AccessibilityPanel visible={showA11y} onClose={() => setShowA11y(false)} />
     </ScrollView>
+    </PantallaConTeclado>
   );
 }
 

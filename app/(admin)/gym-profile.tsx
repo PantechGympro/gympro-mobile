@@ -26,6 +26,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import PantallaConTeclado from '../../components/ui/PantallaConTeclado';
 
 interface TipoGimnasio { value: string; label: string }
 
@@ -156,6 +157,7 @@ export default function GymProfileScreen() {
   const planEtiqueta = gym.plan ?? gym.plan_gymPro;
 
   return (
+    <PantallaConTeclado>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{ paddingBottom: 40 }}
@@ -357,6 +359,7 @@ export default function GymProfileScreen() {
         )}
       </View>
     </ScrollView>
+    </PantallaConTeclado>
   );
 }
 
