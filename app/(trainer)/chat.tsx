@@ -10,7 +10,7 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, TextInput, KeyboardAvoidingView, Platform, Alert,
+  RefreshControl, TextInput, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -197,7 +197,7 @@ export default function TrainerChatScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.screen, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={insets.top + 56}
     >
       {/* Header conversación */}
