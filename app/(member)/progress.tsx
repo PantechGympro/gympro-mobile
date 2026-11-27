@@ -37,6 +37,7 @@ import type { BodyProgress } from '../../types';
 import { estaConectado } from '../../services/offline/connectivity';
 import { encolarAccion } from '../../services/offline/queue';
 import { useFuncionesPlan } from '../../hooks/useFuncionesPlan';
+import PantallaConTeclado from '../../components/ui/PantallaConTeclado';
 
 const SCREEN_W = Dimensions.get('window').width;
 const RANGOS_PROYECCION = [30, 60, 90];
@@ -189,6 +190,7 @@ export default function ProgressScreen() {
   if (loading) return <LoadingSpinner fullScreen message="Cargando progreso…" />;
 
   return (
+    <PantallaConTeclado>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
@@ -440,6 +442,7 @@ export default function ProgressScreen() {
         </View>
       </Modal>
     </ScrollView>
+    </PantallaConTeclado>
   );
 }
 

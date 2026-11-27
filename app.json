@@ -6,6 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#0f0f1a",
     "scheme": "gympro",
     "splash": {
       "image": "./assets/splash.png",
@@ -26,7 +27,8 @@
         "backgroundColor": "#0f0f1a"
       },
       "package": "com.gympro.mobile",
-      "versionCode": 1
+      "versionCode": 1,
+      "backgroundColor": "#0f0f1a"
     },
     "plugins": [
       "expo-router",
